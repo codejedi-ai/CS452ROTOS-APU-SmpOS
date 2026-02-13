@@ -12,7 +12,8 @@ OBJDUMP:=$(XBINDIR)/$(TRIPLE)-objdump
 WARNINGS=-Wall -Wextra -Wpedantic -Wno-unused-const-variable
 
 CFLAGS:=-g -pipe -static $(WARNINGS) -ffreestanding -nostartfiles\
-	-mcpu=$(ARCH) -static-pie -mstrict-align -fno-builtin -mgeneral-regs-only
+	-mcpu=$(ARCH) -static-pie -mstrict-align -fno-builtin -mgeneral-regs-only \
+	-Ilayer0-assembly -Ilayer1-kernel -Ilayer2-services -Ilayer3-application -Ilayer3-application/tests
 
 # -Wl,option tells g++ to pass 'option' to the linker with commas replaced by spaces
 # doing this rather than calling the linker ourselves simplifies the compilation procedure
@@ -20,7 +21,7 @@ LDFLAGS:=-Wl,-nmagic -Wl,-Tlinker.ld
 
 # Source files and include dirs
 
-SOURCES := $(wildcard ui/*.c) $(wildcard tc1/*.c) $(wildcard tests/*.c) $(wildcard *.c) $(wildcard *.S) 
+SOURCES := $(wildcard layer3-application/*.c) $(wildcard layer3-application/tests/*.c) $(wildcard layer2-services/*.c) $(wildcard layer1-kernel/*.c) $(wildcard layer0-assembly/*.S) $(wildcard *.c) $(wildcard *.S) 
 # Create .o and .d files for every .cc and .S (hand-written assembly) file
 OBJECTS := $(patsubst %.c, %.o, $(patsubst %.S, %.o, $(SOURCES)))
 DEPENDS := $(patsubst %.c, %.d, $(patsubst %.S, %.d, $(SOURCES)))
