@@ -200,6 +200,7 @@ void print_error(char *error_msg, int r, int c){
   uart_printf(CONSOLE,"\033[37m"); // "\033[37m"
 }
 void print_in_coulor(int color, char *msg){
+	(void)color; (void)msg;
 
 
 }

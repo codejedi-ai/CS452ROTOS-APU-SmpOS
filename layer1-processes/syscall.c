@@ -12,8 +12,7 @@ extern void EXIT();
 extern void setActiveInterrupt(uint32_t interruptid);
 extern void INTERRUPT_CLEAR_ACTIVE_REGS(uint32_t interruptid);
 extern uint32_t readInterruptId();
-extern uint32_t* get_RIS(uint32_t line);
-extern uint32_t* get_ICR(size_t line);
+#include "rpi.h"
 extern unsigned char uart_getc_modified(size_t line);
 extern uint32_t get_CTS(size_t line);
 extern void clear_GICC_EOIR(uint16_t interrupt_id);
@@ -26,6 +25,16 @@ extern void handlerExceptionHelper(uint64_t esr_el1);
 #define DEBUG_EXIT 1
 # define READY 0
 # define BLOCKED 1
+
+// Kernel-internal data structures
+static void *STACKSTART;
+static uint32_t PID = 0;
+static struct process PROCS[NUMPROCS];
+static struct state READY_QUEUE[NUMPROCS];
+static struct state BLOCKED_LIST[NUMPROCS];
+static struct MinHeapState READY_HEAP;
+static struct interrupt AWAIT_INTERRUPT[MAXEVENT];
+
 // it is time to turn READY_QUEUE into a heap
 // enqueing on a heap is O(log(n))
 // first you 
@@ -79,8 +88,8 @@ void _bubbleUp_state_heap( struct MinHeapState *h, int i)
 }
 void bubbleDown_state_heap( struct MinHeapState *h, int i)
 {
-	int left = 2 * i + 1;
-	int right = 2 * i + 2;
+	unsigned int left = 2 * i + 1;
+	unsigned int right = 2 * i + 2;
 	int smallest = i;
 	// if there is no child
 	if ((unsigned int)left >= h->size && (unsigned int)right >= h->size)
@@ -190,6 +199,7 @@ int unblock_ind(int pid, uint64_t priority)
 	*/
 	if(BLOCKED_LIST[pid - 1].pid == 0 && BLOCKED_LIST[pid - 1].priority == priority) return 0;
 	int p = PID - 1;
+	(void)p; // Unused
 	scrSchedule(pid, priority);
 	BLOCKED_LIST[pid - 1].pid = 0;
 	return 0;
@@ -212,6 +222,7 @@ void unblock(struct state currItem)
 	int pid = currItem.pid;
 	uint64_t priority = currItem.priority;
 	int ready = currItem.time;
+	(void)ready; // Unused
 	// uart_printf(CONSOLE, "unblock: pid = %u priority = %u ready =%u\r\n", pid, priority);
 	
 	unblock_ind(pid, priority);
@@ -220,6 +231,7 @@ int scrPick()
 {
 	int pid = -1;
 	int bump = 0;
+	(void)bump; // Unused
 	/*
 	struct state emptyItem = {0, 0, 0};
 	
@@ -241,6 +253,7 @@ int scrPick()
 	return pid;
 }
 void debugPrint(char *str){
+	(void)str;
 	#if DEBUG == 4
 	uart_printf(CONSOLE, str);
 	#endif
@@ -328,6 +341,7 @@ int unblock_return(uint32_t interruptid, uint64_t ret){
 		
 		struct state freed_state = AWAIT_INTERRUPT[interruptid].pid_ls[i];
 		int p = PID - 1;
+		(void)p; // Unused
 		int p_free = freed_state.pid - 1;
 		freed_state.time = READY;
 		# if DEBUG == 4
@@ -345,6 +359,7 @@ int unblock_return(uint32_t interruptid, uint64_t ret){
 }
 
 void ExceptionASYNC(uint64_t esr_el1){
+	(void)esr_el1;
     int p = PID - 1;
     
     
@@ -382,11 +397,11 @@ void ExceptionASYNC(uint64_t esr_el1){
 			// the first byte of the char is the type of interrupt given
 			// the second byte of the char is the line number
 			// the last byte of the char is the return value
-			uint32_t* RIS_CONSOLE = get_RIS(CONSOLE);
-			uint32_t* ICR_CONSOLE = get_ICR(CONSOLE);
+			volatile uint32_t* RIS_CONSOLE = get_RIS(CONSOLE);
+			volatile uint32_t* ICR_CONSOLE = get_ICR(CONSOLE);
 
-			uint32_t* RIS_MARKLIN = get_RIS(MARKLIN);
-			uint32_t* ICR_MARKLIN = get_ICR(MARKLIN);
+			volatile uint32_t* RIS_MARKLIN = get_RIS(MARKLIN);
+			volatile uint32_t* ICR_MARKLIN = get_ICR(MARKLIN);
 			if((*RIS_CONSOLE) & (0x01 << CTSMIM)){
 				// RXIC on the marklin
 				return_val[0] = CTSMIM;
@@ -943,8 +958,8 @@ void bubbleUp( struct MinHeap *h, int i)
 }
 void bubbleDown( struct MinHeap *h, int i)
 {
-	int left = 2 * i + 1;
-	int right = 2 * i + 2;
+	unsigned int left = 2 * i + 1;
+	unsigned int right = 2 * i + 2;
 	int smallest = i;
 	// if there is no child
 	if ((unsigned int)left >= h->size && (unsigned int)right >= h->size)
@@ -1048,15 +1063,18 @@ void Kill(int p) // p is the position of the process in the PROCS array
 // Version 1 implementation would have the task directlly tell the kernel
 // to put a specific message in the messageDS of the targeted task. 
 int Send(int tid, const char *msg, int msglen, char *reply, int replylen){
+	(void)tid; (void)msg; (void)msglen; (void)reply; (void)replylen;
 	asm("svc 5");
 	return 0;
 }
 
 int Receive(int *tid, char *msg, int msglen){
+	(void)tid; (void)msg; (void)msglen;
 	asm("svc 6");
 	return 0;
 }
 int Reply( int tid, void *reply, int replylen ){
+	(void)tid; (void)reply; (void)replylen;
 	asm("svc 7");
 	return 0;
 }
@@ -1081,6 +1099,7 @@ int MyParentTid()
 }
 
 int Create(uint64_t priority, void (*function)()) { // Returns to the Kernel, then calls KernelCreate
+	(void)priority; (void)function;
 	asm("svc 2"); // The Kernel needs to put the pid in x0
 	return 0;
 }

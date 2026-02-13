@@ -111,11 +111,11 @@ uint32_t get_CTS(size_t line) {
   return (UART_REG(line, UART_FR) & UART_FR_CTS);
 }
 
-uint32_t* get_RIS(uint32_t line) {
+volatile uint32_t* get_RIS(uint32_t line) {
   return &UART_REG(line, UART_RIS);
 }
 
-uint32_t* get_ICR(size_t line) {
+volatile uint32_t* get_ICR(size_t line) {
   return &UART_REG(line, UART_ICR);
 }
 

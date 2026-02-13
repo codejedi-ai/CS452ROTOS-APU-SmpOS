@@ -8,9 +8,9 @@
 #define CONSOLE 1
 #define MARKLIN 2
 
-uint32_t* get_RIS(uint32_t line);
+volatile uint32_t* get_RIS(uint32_t line);
 uint32_t get_CTS(size_t line);
-uint32_t* get_ICR(size_t line);
+volatile uint32_t* get_ICR(size_t line);
 void enable_RX_and_TX();
 
 

@@ -41,7 +41,6 @@ uint64_t *mymalloc(uint64_t size)
     return 0;
   // curNode is the adress we keep the size value
   // splitting
-  uint64_t avalSize = *curNode;
   if (*curNode > wordNeedAllocateinBytes)
   {
     // this bar initializes the new node
@@ -68,7 +67,6 @@ void myfree(uint64_t *address)
   // cout << "Freeing: " << p << endl;
   //  need to use a reference freelisthead is the reference to the head
   //  need to store the value and address of the free list head
-  uint64_t prev = freeListRoot;                       // *listHead is the head of the list
   uint64_t FLH = freeListRoot;                        // *listHead is the head of the list
   uint64_t next = ((uint64_t) * ((uint64_t *)FLH + 1)); // next is a lvalue
   address = address - 1;
@@ -148,7 +146,7 @@ void printFreeList()
 int malloctest() {
     uint64_t result = 0;
     uint64_t* one = mymalloc(241);
-    uint64_t* two = mymalloc(241);
+    mymalloc(241); // Allocate but don't use
     myfree(one);
 
     uint64_t* evil = mymalloc(240);

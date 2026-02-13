@@ -13,12 +13,9 @@
 # define TXIC 5
 # define RXIC 4
 # define CTSMIM 1
-static void *STACKSTART;
-// This is the PID of the currentlly running process
-static uint32_t PID = 0;
 
-
-
+// Forward declarations for kernel-internal data structures
+// (actual definitions are in syscall.c)
 
 // static const int NUMPROCS = 20; // Deprecated
 
@@ -92,11 +89,7 @@ struct MinHeapState
 	unsigned capacity;
 	struct state *harr;
 };
-static struct process PROCS[NUMPROCS];
-static struct state READY_QUEUE[NUMPROCS];
-static struct state BLOCKED_LIST[NUMPROCS];
-static struct MinHeapState READY_HEAP;
-static struct interrupt AWAIT_INTERRUPT[MAXEVENT];
+
 void scrSchedule(int pid, uint64_t priority);
 int scrPick();
 void HandleASYNC(void* sp);

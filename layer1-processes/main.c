@@ -14,7 +14,7 @@ void idle(){
 		uint32_t kernelrt = GetKernelRuntime();
     // print the column and row onto 2 and 1
     uart_printf(CONSOLE, "\033[2;1H");
-		uart_printf(CONSOLE, "idle: runprecentage = %u \% \r\n", (100 * runtime) / kernelrt);
+		uart_printf(CONSOLE, "idle: runprecentage = %u %% \r\n", (100 * runtime) / kernelrt);
 		asm("WFI");
 	}
 	Exit();
@@ -30,6 +30,7 @@ int kmain(void *reg) {
 
   // Initialize basic system services
   int tid = KernelCreate(-1, idle, 0);
+  (void)tid; // Unused for now
   
   #if CLOCKSERVERON == 1
   // Basic timer setup
