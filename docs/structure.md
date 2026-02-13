@@ -82,11 +82,11 @@ The kernel does **not** start train services, shell, or I/O servers for the seco
 | **message.c / .h** | Message passing infrastructure: `Send`, `Receive`, `Reply`, message queues. |
 | **ipc.c / .h** | Inter-process communication primitives and synchronization. |
 
-The messaging layer provides the foundation for communication between processes in higher layers.
+The messaging layer provides the foundation for communication between processes in higher layers. This layer is currently being implemented.
 
 ---
 
-## layer3-application
+## layer4-application
 
 **Role:** Applications and train control: shell, track/train logic, **tc1 command parsing**, and tests. **All of this lives here** — there is no separate `tc1/` or `ui/` folder.
 
