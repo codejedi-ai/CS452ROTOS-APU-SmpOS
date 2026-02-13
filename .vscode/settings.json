@@ -1,0 +1,33 @@
+{
+    "C_Cpp.default.compilerPath": "d:\\arm-gnu-toolchain-13.2.Rel1-mingw-w64-i686-aarch64-none-elf\\bin\\aarch64-none-elf-gcc.exe",
+    "files.associations": {
+        "k2rps.h": "c",
+        "systimer.h": "c",
+        "nameserver.h": "c",
+        "track_node.h": "c",
+        "track_data_new.h": "c",
+        "cstdlib": "c",
+        "printmethod.h": "c",
+        "clockserver.h": "c",
+        "ioserver.h": "c",
+        "rpi.h": "c",
+        "custstr.h": "c",
+        "mcc.h": "c",
+        "gic.h": "c",
+        "util.h": "c",
+        "typeinfo": "c",
+        "processes.h": "c",
+        "syscall.h": "c",
+        "asm.h": "c",
+        "trainnsol.h": "c",
+        "shell.h": "c",
+        "marklin_worker.h": "c",
+        "train.h": "c",
+        "speed_measuring.h": "c",
+        "track_path_finder.h": "c",
+        "train_control.h": "c",
+        "tc1tests.h": "c",
+        "track_server.h": "c",
+        "train_velocity.h": "c"
+    }
+}

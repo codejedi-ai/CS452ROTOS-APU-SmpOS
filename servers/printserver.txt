@@ -1,0 +1,39 @@
+#include "../syscall.h"
+#include "../rps.h"
+#define SET_CURSOR 0
+void print_server(){
+    RegisterAs("print_server");
+    int cols[NUMPROCS];
+    int rows[NUMPROCS];
+    while (1)
+    {
+        int tid = -1;
+        char msg[3];
+        Receive(&tid, msg, 3);
+        if(msg[0] == SET_CURSOR){
+            cols[tid] = msg[1];
+            rows[tid] = msg[2];
+        }
+        else{
+            int col = cols[tid];
+            int row = rows[tid];
+            uart_printf(CONSOLE, "\033[%d;%dH", row, col);
+            uart_printf(tid, "%c", msg[0]);
+        }
+    }
+    
+}
+void set_cursor(char r, char c){
+    int print_server_tid = WhoIs("print_server");
+    char msg[3];
+    msg[0] = SET_CURSOR;
+    msg[1] = r;
+    msg[2] = c;
+    Send(print_server_tid, msg, 3, 0, 0);
+}
+void print_char(char c){
+    int print_server_tid = WhoIs("print_server");
+    char msg[3];
+    msg[0] = c;
+    Send(print_server_tid, msg, 3, 0, 0);
+}
