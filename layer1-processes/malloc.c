@@ -3,7 +3,6 @@
 #include "asm.h"
 #include "rpi.h"
 #include "util.h"
-#include "custstr.h"
 #include "gic.h"
 #include "malloc.h"
 #define HEAP_ADDR 0x1000000

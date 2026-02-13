@@ -12,6 +12,7 @@ Galatea-NIX/
 ├── linker.ld
 ├── README.md
 ├── docs/                    # Documentation (this file, etc.)
+├── library/                 # Common utility functions for all layers
 ├── calibrationdata/        # Train calibration data (optional)
 ├── layer0-assembly/         # Boot and exception vectors
 ├── layer1-processes/        # Process management: processes, syscalls, drivers
@@ -32,6 +33,19 @@ Galatea-NIX/
 | **Makefile** | Builds the kernel: compiles layer0–layer3, links with `linker.ld`, produces `0-d273liu.elf` and `0-d273liu.img`. Targets: `all` (default), `clean`. |
 | **linker.ld** | Linker script. Sets entry to `_start` and places `.text.boot` at `0x80000`. |
 | **README.md** | Project overview and quick start. |
+
+---
+
+## library
+
+**Role:** Common utility functions used across all layers.
+
+| File | Purpose |
+|------|--------|
+| **math.c / .h** | Mathematical utilities: `min_u64`, `max_u64`, `min_int`, `max_int`. |
+| **string.c / .h** | String utilities: `atoi_64`, `str_to_hex`, `strcmp_ret`, inline helpers `a2d`, `is_empty`, `is_hex`. |
+
+These are generic, reusable functions available to all layers via `-Ilibrary` include path.
 
 ---
 
@@ -63,8 +77,6 @@ Headers (e.g. `asm.h`) live in **layer1-processes** and declare the assembly ent
 | **systimer.c / .h** | Kernel timer: `get_timerLO/HI`, `set_timerC3`, `clear_timer_status` for clock server. |
 | **malloc.c** | Kernel heap allocator (used for process stacks, etc.). |
 | **util.c / .h** | Helpers: `memset`, `memcpy`, `i2a`, `ui2a`, print helpers. |
-| **custstr.c / .h** | Custom string: `strcmp_ret`, `parse_char_arr`, `cust_strcpy`, `strcat_cust`, `is_empty`. |
-| **custmath.c / .h** | Custom math (e.g. `min`) and 64-bit helpers. |
 | **int64voodoo.c / .h** | 64-bit arithmetic / helpers. |
 | **debugprint.c** | Debug output helpers. |
 | **asm.h** | Declarations for assembly routines in layer0 (e.g. `Begin`, `Save`, `ASYNCSave`). |

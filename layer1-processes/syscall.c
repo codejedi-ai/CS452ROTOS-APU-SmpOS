@@ -3,7 +3,7 @@
 #include "asm.h"
 #include "rpi.h"
 #include "util.h"
-#include "custstr.h"
+#include "math.h"
 #include "systimer.h"
 #include "gic.h"
 
@@ -18,7 +18,6 @@ extern uint32_t get_CTS(size_t line);
 extern void clear_GICC_EOIR(uint16_t interrupt_id);
 extern uint32_t checkActiveInterrupt(uint32_t interrupt_id);
 extern int KernelCreate(uint64_t priority, void (*function)(), int parent);
-extern int min(int a, int b);
 extern void recieve_helper(int PID);
 extern void handlerExceptionHelper(uint64_t esr_el1);
 #define DEBUG 5
@@ -637,7 +636,7 @@ void recieve_helper(int PID){
 	# endif
 	// msg is the destination curread_msg is the source
 	// msglen = cust_strcpy(msg, msglen - 1, curread_msg, curread_message_length - 1) + 1;
-	msglen = min(msglen, curread_message_length);
+	msglen = min_int(msglen, curread_message_length);
 	memcpy(msg, curread_msg, msglen);
 	
 	# if DEBUG == 2 
@@ -692,7 +691,7 @@ void reply_helper(){
 
 
 	// // uart_printf(CONSOLE, "*reply is %c\r\n", *reply);
-	replylen = min(reply_buffer_len, replylen);
+	replylen = min_int(reply_buffer_len, replylen);
 	memcpy(reply_buffer, reply, replylen);
 	// replylen = cust_strcpy(reply_buffer, reply_buffer_len - 1, reply, replylen - 1) + 1;
 
