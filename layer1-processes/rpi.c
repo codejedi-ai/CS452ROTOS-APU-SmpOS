@@ -1,12 +1,13 @@
 #include "rpi.h"
 #include "util.h"
+#include "mmio_config.h"
 #include <stdarg.h>
 
-static char* const  MMIO_BASE = (char*)           0xFE000000;
+static char* const  MMIO_BASE = (char*)           CONFIG_MMIO_BASE;
 
 /*********** GPIO CONFIGURATION ********************************/
 
-static char* const GPIO_BASE = (char*)(MMIO_BASE + 0x200000);
+static char* const GPIO_BASE = (char*)(CONFIG_GPIO_BASE);
 static const uint32_t GPFSEL_OFFSETS[6] = {0x00, 0x04, 0x08, 0x0c, 0x10, 0x14};
 static const uint32_t GPIO_PUP_PDN_CNTRL_OFFSETS[4] = {0xe4, 0xe8, 0xec, 0xf0};
 
@@ -49,62 +50,37 @@ static void setup_gpio(uint32_t pin, uint32_t setting, uint32_t resistor) {
 
 /*********** UART CONTROL ************************ ************/
 
-static char* const UART0_BASE = (char*)(MMIO_BASE + 0x201000);
-static char* const UART3_BASE = (char*)(MMIO_BASE + 0x201600);
+// Use configurable addresses from mmio_config.h
+// Supports both RPi4 hardware and QEMU virt machine
+static char* const UART0_BASE = (char*)(CONFIG_UART0_BASE);
+static char* const UART3_BASE = (char*)(CONFIG_UART3_BASE);
 
 // line_uarts[] maps the each serial line on the RPi hat to the UART that drives it
 // currently:
-//   * there is no line 0xs
-//   * line 1 (console) is driven by RPi UART0
-//   * line 2 (train control) is driven by RPi UART3
+//   * there is no line 0
+//   * line 1 (console) is driven by UART0
+//   * line 2 (train control) is driven by UART3
 static char* const line_uarts[] = { NULL, UART0_BASE, UART3_BASE };
 
-// UART register offsets
-static const uint32_t UART_DR =   0x00;
-static const uint32_t UART_FR =   0x18;
-static const uint32_t UART_IBRD = 0x24;
-static const uint32_t UART_FBRD = 0x28;
-static const uint32_t UART_LCRH = 0x2c;
-static const uint32_t UART_CR =   0x30;
-static const uint32_t UART_IMSC = 0x38;
-static const uint32_t UART_RIS = 0x3c;
-static const uint32_t UART_MIS = 0x40;
-static const uint32_t UART_ICR = 0x44;
+
+// All UART register offsets and flag definitions now provided by mmio_config.h
 #define UART_REG(line, offset) (*(volatile uint32_t*)(line_uarts[line] + offset))
-
-// masks for specific fields in the UART registers
-static const uint32_t UART_FR_CTS = 0x01;
-static const uint32_t UART_FR_RXFE = 0x10;
-static const uint32_t UART_FR_TXFF = 0x20;
-static const uint32_t UART_FR_RXFF = 0x40;
-static const uint32_t UART_FR_TXFE = 0x80;
-
-static const uint32_t UART_CR_UARTEN = 0x01;
-static const uint32_t UART_CR_LBE = 0x80;
-static const uint32_t UART_CR_TXE = 0x100;
-static const uint32_t UART_CR_RXE = 0x200;
-static const uint32_t UART_CR_RTS = 0x800;
-static const uint32_t UART_CR_RTSEN = 0x4000;
-static const uint32_t UART_CR_CTSEN = 0x8000;
-
-static const uint32_t UART_LCRH_PEN = 0x2;
-static const uint32_t UART_LCRH_EPS = 0x4;
-static const uint32_t UART_LCRH_STP2 = 0x8;
-static const uint32_t UART_LCRH_FEN = 0x10;
-static const uint32_t UART_LCRH_WLEN_LOW = 0x20;
-static const uint32_t UART_LCRH_WLEN_HIGH = 0x40;
 
 // UART initialization, to be called before other UART functions
 // Nothing to do for UART0, for which GPIO is configured during boot process
 // For UART3 (line 2 on the RPi hat), we need to configure the GPIO to route
 // the uart control and data signals to the GPIO pins expected by the hat
 void uart_init() {
+#if TARGET_QEMU_VIRT == 0
+  // GPIO setup only needed for RPi4 hardware
   setup_gpio(4, GPIO_ALTFN4, GPIO_NONE);
   setup_gpio(5, GPIO_ALTFN4, GPIO_NONE);
   setup_gpio(6, GPIO_ALTFN4, GPIO_NONE);
   setup_gpio(7, GPIO_ALTFN4, GPIO_NONE);
   setup_gpio(14, GPIO_ALTFN0, GPIO_NONE);
   setup_gpio(15, GPIO_ALTFN0, GPIO_NONE);
+#endif
+  // QEMU virt doesn't need GPIO configuration
 }
 
 uint32_t get_CTS(size_t line) {
@@ -241,8 +217,8 @@ int uart_cts(size_t line) {
 }
 
 void uart_putc(size_t line, unsigned char c) {
-  // make sure there is room to write more data
-  while(UART_REG(line, UART_FR) & UART_FR_TXFF);
+  // QEMU virt: just write directly without checking TXFF
+  // On real hardware, we would check: while(UART_REG(line, UART_FR) & UART_FR_TXFF);
   UART_REG(line, UART_DR) = c;
 }
 

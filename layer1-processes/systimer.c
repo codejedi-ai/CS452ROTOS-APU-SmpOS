@@ -1,11 +1,12 @@
 #include "rpi.h"
 #include "util.h"
+#include "mmio_config.h"
 #include <stdarg.h>
 # include "systimer.h"
-static char* const  MMIO_BASE = (char*)           0xFE000000;
+static char* const  MMIO_BASE = (char*)           CONFIG_MMIO_BASE;
 /*********** SYSTIMER CONTROL ************************ ************/
 
-static char* const SYSTIMER_BASE = (char*)(MMIO_BASE + 0x003000); // it is not 0x7E003000 replace every 0x7E we use 0xFE
+static char* const SYSTIMER_BASE = (char*)(CONFIG_SYSTIMER_BASE); // Using CONFIG_SYSTIMER_BASE for platform independence
 
 // SYSTIME Register Offsets and Descriptions
 // differnt control registers for the timer
@@ -23,14 +24,26 @@ static const uint32_t SYSTIME_C3   = 0x18;   // System Timer Compare 3
 // This is the timer value []
 
 uint32_t get_timerLO() {
-    // Read the values from SYSTIME_CHI and SYSTIME_CLO
+#if TARGET_QEMU_VIRT == 1
+    // QEMU virt uses ARM architecturally-defined timers
+    // For now, return 0 to prevent hangs during init
+    return 0;
+#else
+    // RPi4 has memory-mapped system timer
     const unsigned int ret = SYSTIMER_REG(SYSTIME_CLO);
     return ret;
+#endif
 }
 uint32_t get_timerHI(){
-    // Read the values from SYSTIME_CHI and SYSTIME_CLO
+#if TARGET_QEMU_VIRT == 1
+    // QEMU virt uses ARM architecturally-defined timers
+    // For now, return 0 to prevent hangs during init
+    return 0;
+#else
+    // RPi4 has memory-mapped system timer
     const unsigned int ret = SYSTIMER_REG(SYSTIME_CHI);
     return ret;
+#endif
 }
 uint64_t get_timerFULL(){
     uint64_t time = get_timerHI();

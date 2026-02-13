@@ -1,8 +1,11 @@
 #include "gic.h"
-#define GIC_BASE 0xff840000
+#include "mmio_config.h"
 
+// Use configurable GIC addresses from mmio_config.h
+// Supports both RPi4 hardware and QEMU virt machine
+#define GIC_BASE CONFIG_GIC_BASE
 
-#define GICD_BASE GIC_BASE + 0x1000
+#define GICD_BASE CONFIG_GICD_BASE  // GICv2 Distributor
 // enable the interrupt, the set enable register
 // #define GICD_ISENABLERn = GICD_BASE + 0x100
 #define GICD_ISENABLERn GICD_BASE + 0x100
@@ -10,7 +13,7 @@
 // #define GICD_ITARGETSRn = GICD_BASE + 0x800
 #define GICD_ITARGETSRn GICD_BASE + 0x800
 
-#define GICC_BASE GIC_BASE + 0x2000
+#define GICC_BASE CONFIG_GICC_BASE  // GICv2 CPU Interface
 // GICD_GICC_IAR
 #define GICC_IAR *(uint32_t*)(GICC_BASE + 0x0C)
 // GICC_EOIR

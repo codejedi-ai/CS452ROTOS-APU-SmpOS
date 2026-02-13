@@ -1,0 +1,27 @@
+[1]
+[2]
+[3]
+[4]
+[5]
+Galatea-NIX kernel ready.
+All Tasks Complete, Press Any Key to Exit
+PID: 1, State: 0, Priority: 4294967295
+PID: 1, State: 0, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295
+PID: 0, State: 4294967295, Priority: 4294967295

@@ -1,7 +1,7 @@
 ENTRY(_start)
 SECTIONS {
-  . = 0x80000;           /* start text at this location */
+  . = 0x40000000;
   .text.boot : {
-    KEEP(*(.text.boot))  /* boot code must come first */
+    KEEP(*(.text.boot))
   }
 }

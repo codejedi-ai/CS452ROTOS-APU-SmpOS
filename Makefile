@@ -11,9 +11,22 @@ OBJDUMP:=$(XBINDIR)/$(TRIPLE)-objdump
 # -ffunction-sections causes each function to be in a separate section (linker script relies on this)
 WARNINGS=-Wall -Wextra -Wpedantic -Wno-unused-const-variable
 
+# Platform configuration: QEMU_VIRT (default) or RPI4
+PLATFORM ?= QEMU_VIRT
+
+# Set TARGET_QEMU_VIRT flag based on PLATFORM
+ifeq ($(PLATFORM),QEMU_VIRT)
+  PLATFORM_FLAG := -DTARGET_QEMU_VIRT=1
+else ifeq ($(PLATFORM),RPI4)
+  PLATFORM_FLAG := -DTARGET_QEMU_VIRT=0
+else
+  $(error Invalid PLATFORM. Use PLATFORM=QEMU_VIRT or PLATFORM=RPI4)
+endif
+
 CFLAGS:=-g -pipe -static $(WARNINGS) -ffreestanding -nostartfiles\
 	-mcpu=$(ARCH) -static-pie -mstrict-align -fno-builtin -mgeneral-regs-only \
-	-Ilayer0-assembly -Ilayer1-processes -Ilayer2-messaging -Ilibrary -fno-builtin-memcpy
+	-Ilayer0-assembly -Ilayer1-processes -Ilayer2-messaging -Ilibrary -fno-builtin-memcpy \
+	$(PLATFORM_FLAG)
 
 # -Wl,option tells g++ to pass 'option' to the linker with commas replaced by spaces
 # doing this rather than calling the linker ourselves simplifies the compilation procedure
