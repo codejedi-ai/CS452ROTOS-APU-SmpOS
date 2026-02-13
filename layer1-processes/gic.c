@@ -19,13 +19,13 @@
 
 
 
-#define GICD_ITARGETSR(n) (*(uint32_t*)(GICD_ITARGETSRn + (4 * n)))
+#define GICD_ITARGETSR(n) (*(volatile uint32_t*)((char*)GICD_ITARGETSRn + (4 * n)))
 // enable the interrupt use GICD_ISENABLERn 4-byte registers, with 1 bit per InterruptID
-#define GICD_ISENABLER(n) (*(uint32_t*)(GICD_ISENABLERn + (4 * n)))
+#define GICD_ISENABLER(n) (*(volatile uint32_t*)((char*)GICD_ISENABLERn + (4 * n)))
 // set active interrupt
-#define GICD_ISACTIVERn(n) (*(uint32_t*)(GICD_ISENABLERn + (4 * n)))
+#define GICD_ISACTIVERn(n) (*(volatile uint32_t*)((char*)GICD_ISENABLERn + (4 * n)))
 // clear active interrupt
-#define GICD_ICACTIVERn(n) (*(uint32_t*)(GICD_ISENABLERn + (4 * n)))
+#define GICD_ICACTIVERn(n) (*(volatile uint32_t*)((char*)GICD_ISENABLERn + (4 * n)))
 
 # define DEBUG 1
 /*
