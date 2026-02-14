@@ -6,6 +6,7 @@
 #include "math.h"
 #include "systimer.h"
 #include "gic.h"
+#include "../layer2-messaging/messaging.h"
 
 // Forward declarations for functions that may be missing
 extern void EXIT();
@@ -17,18 +18,19 @@ extern unsigned char uart_getc_modified(size_t line);
 extern uint32_t get_CTS(size_t line);
 extern void clear_GICC_EOIR(uint16_t interrupt_id);
 extern uint32_t checkActiveInterrupt(uint32_t interrupt_id);
-extern int KernelCreate(uint64_t priority, void (*function)(), int parent);
+extern int KernelCreate(uint8_t priority, void (*function)(), int parent);
 extern void recieve_helper(int PID);
 extern void handlerExceptionHelper(uint64_t esr_el1);
 #define DEBUG 5
-#define DEBUG_EXIT 1
+#define DEBUG_EXIT 0
 # define READY 0
 # define BLOCKED 1
 
 // Kernel-internal data structures
+// Note: PID and PROCS are exposed to layer2-messaging for IPC
 static void *STACKSTART;
-static uint32_t PID = 0;
-static struct process PROCS[NUMPROCS];
+uint32_t PID = 0;
+struct process PROCS[NUMPROCS];
 static struct state READY_QUEUE[NUMPROCS];
 static struct state BLOCKED_LIST[NUMPROCS];
 static struct MinHeapState READY_HEAP;
@@ -152,7 +154,7 @@ struct state extractMin_state_heap( struct MinHeapState *h)
 //HEAP IMPLEMENTATION END
 
 // scrSchedule(pid, priority)
-void scrSchedule(int pid, uint64_t priority)
+void scrSchedule(int pid, uint8_t priority)
 {
 
 	struct state currItem = {pid, priority, ((uint64_t)get_timerHI() << 32) + get_timerLO()};
@@ -179,7 +181,7 @@ void scrSchedule(int pid, uint64_t priority)
 }
 
 // scrSchedule(pid, priority)
-int unblock_ind(int pid, uint64_t priority)
+int unblock_ind(int pid, uint8_t priority)
 {
 	/*
 	// uart_printf(CONSOLE, "unblock: pid = %u priority = %u ready =%u\r\n", pid, priority);
@@ -207,7 +209,7 @@ int unblock_ind(int pid, uint64_t priority)
 scrSchedule(PID, PROCS[p].priority, BLOCKED);
 block(PID, PROCS[p].priority);
 					*/
-void block(int pid, uint64_t priority){
+void block(int pid, uint8_t priority){
 	// uart_printf(CONSOLE, "block: pid = %u priority = %u\r\n", pid, priority);
 	//scrSchedule(pid, priority, BLOCKED);
 	BLOCKED_LIST[pid - 1].pid = pid;
@@ -219,7 +221,7 @@ void unblock(struct state currItem)
 {
 	// uart_printf(CONSOLE, "unblock: pid = %u priority = %u ready =%u\r\n", pid, priority);
 	int pid = currItem.pid;
-	uint64_t priority = currItem.priority;
+	uint8_t priority = currItem.priority;
 	int ready = currItem.time;
 	(void)ready; // Unused
 	// uart_printf(CONSOLE, "unblock: pid = %u priority = %u ready =%u\r\n", pid, priority);
@@ -246,9 +248,15 @@ int scrPick()
 	}
 	if (bump) {READY_QUEUE[NUMPROCS - 1] = emptyItem;}
 	*/
+	#if DEBUG_EXIT >= 1
+	uart_printf(CONSOLE, "[DEBUG] scrPick: READY_HEAP size=%u\r\n", READY_HEAP.size);
+	#endif
 	if (isEmpty_state_heap(&READY_HEAP)) return -1;
 	struct state currItem = extractMin_state_heap(&READY_HEAP);
 	pid = currItem.pid;
+	#if DEBUG_EXIT >= 1
+	uart_printf(CONSOLE, "[DEBUG] scrPick: picked PID=%d, priority=%u\r\n", pid, currItem.priority);
+	#endif
 	return pid;
 }
 void debugPrint(char *str){
@@ -501,9 +509,17 @@ void Handle(void* sp) // A helper function to pull some c variables into assembl
 	Schedule();
 	#if DEBUG_EXIT >= 1
 		uart_printf(CONSOLE, "All Tasks Complete, Press Any Key to Exit\n\r"); // Nothing left // Upon maybe K2, the Kernel may be waiting at this point for user input, or other stuff for Processes to wake up. At this point, the Kernel should in theory spin
-		// print the queue of all tasks, print by PID: state
+		// print the heap of ready tasks (not the entire array)
+		uart_printf(CONSOLE, "\r\nREADY HEAP (size=%u):\r\n", READY_HEAP.size);
+		for (unsigned i = 0; i < READY_HEAP.size; i++) {
+			uart_printf(CONSOLE, "  [%u] PID: %u, Priority: %u\r\n", i, READY_HEAP.harr[i].pid, READY_HEAP.harr[i].priority);
+		}
+		uart_printf(CONSOLE, "\r\nAll PROCS states:\r\n");
 		for (int i = 0; i < NUMPROCS; i++) {
-			uart_printf(CONSOLE, "PID: %u, State: %u, Priority: %u\r\n", READY_QUEUE[i].pid, READY_QUEUE[i].time, READY_QUEUE[i].priority);
+			if (PROCS[i].pcpointer != NULL) {
+				uart_printf(CONSOLE, "  PID %u: Priority: %u, PC: %p, SP: %p\r\n", 
+				           PROCS[i].pid, PROCS[i].priority, PROCS[i].pcpointer, PROCS[i].stackpointer);
+			}
 		}
 	uart_getc(1);
 	EXIT();
@@ -516,205 +532,9 @@ int8_t dead(int8_t p){
 	return (PROCS[p].stackpointer == NULL && PROCS[p].pcpointer == NULL);
 }
 // Each parameter is now stored in the registers
-void send_helper(){
-	# if DEBUG == 2
-	// print the function called
-	// uart_printf(CONSOLE, "===============\r\n Send Helper Called:\r\n");
-	# endif
-	// Debug
-	int p = PID - 1;
-	int tid = (int)PROCS[p].registervalues[0];
-	char *msg = (char *)PROCS[p].registervalues[1];
-	uint64_t msglen = PROCS[p].registervalues[2];
-	char *reply = (char *)PROCS[p].registervalues[3];
-	uint64_t replylen = PROCS[p].registervalues[4];
-
-	// This puts the message into the messageDS of the target task
-	PROCS[p].message_sent.tid = tid;
-	PROCS[p].message_sent.msg = msg;
-	PROCS[p].message_sent.msglen = msglen;
-	PROCS[p].message_sent.reply = reply;
-	PROCS[p].message_sent.replylen = replylen;
-	PROCS[p].waiting_reply = 1;
-	// This is the target task, if it is waiting_send then we need ot remove the waiting send and unblock the task
-	int p_to = tid - 1;
-	int tail = PROCS[p_to].waiting_recieve_tail;
-	PROCS[p_to].message_recieved[tail].tid = PID; // This is the tricky part for the recieved it should be the sender's pid
-	PROCS[p_to].message_recieved[tail].msg = msg;
-	PROCS[p_to].message_recieved[tail].msglen = msglen;
-	PROCS[p_to].message_recieved[tail].reply = reply;
-	PROCS[p_to].message_recieved[tail].replylen = replylen;
-	// // uart_printf(CONSOLE, "reply addr is %x\r\n", reply);
-	PROCS[p_to].waiting_recieve_tail++;
-	PROCS[p_to].waiting_recieve_tail %= QUEUESIZE;
-	PROCS[p_to].queuesize++;
-	
-	# if DEBUG == 2
-	// print the function called
-	// uart_printf(CONSOLE, "===============\r\n Completed adding message to the queue:\r\n");
-	// print all the params
-	// uart_printf(CONSOLE, "TID is %u\r\n", tid);
-	// uart_printf(CONSOLE, "MSG is %s\r\n", msg);
-	// uart_printf(CONSOLE, "MSGLEN is %u\r\n", msglen);
-	// uart_printf(CONSOLE, "REPLY is %s\r\n", reply);
-	// uart_printf(CONSOLE, "REPLYLEN is %u\r\n ============== \r\n", replylen);
-	# endif
-	if (PROCS[p_to].waiting_send == 1){
-		// The task is waiting for a message
-		// unblock the task
-		# if DEBUG == 2
-		// print therefore unblocked
-		// uart_printf(CONSOLE, "===============\r\n RECIEVE HELPER FOR %u by Send Helper Unblocked:\r\n", tid);
-		# endif
-
-		recieve_helper(tid);
-	}
-	// At this point we need to wake up the message processing task
-	
-}
-// It assumes that the messageDS is not empty
-// recieve takes a message from the mailbox and returns the message inplace
-void recieve_helper(int PID){
-	int p = PID - 1;
-	int head = PROCS[p].waiting_recieve_head;
-	int tail = PROCS[p].waiting_recieve_tail;
-	# if DEBUG
-	// print PID
-	// uart_printf(CONSOLE, "=============== Recieve called by PID:%u\r\n", PID);
-	// uart_printf(CONSOLE, "head is %u, tail is %u\r\n", head, tail);
-	# endif
-	
-	int *tid =  (int *)PROCS[p].registervalues[0]; // This is a memory address for the TID
-	char *msg = (char *)PROCS[p].registervalues[1]; // this is another memory address for the message
-	int msglen = (int)PROCS[p].registervalues[2];
-	# if DEBUG == 2
-	// print therefore blocked
-	
-	// print the value of the tid poitnter msg pointer and the msglen pointer
-	// uart_printf(CONSOLE, "p = %d\r\n", p);
-	// uart_printf(CONSOLE, "TID is %x\r\n", tid);
-	// uart_printf(CONSOLE, "MSG is %x\r\n", msg);
-	// uart_printf(CONSOLE, "MSGLEN is %u\r\n ===============\r\n ", msglen);
-
-	# endif
-	if (head == tail){
-		// // uart_printf(CONSOLE, "===============\r\n Recieve Helper Blocked:\r\n");
-		// The messageDS is empty
-		// Block the task
-		// it is replying to a not reply blocked task
-
-		PROCS[p].waiting_send = 1;
-		return;
-	}
-	PROCS[p].waiting_send = 0;
-	// unblock the task I really do not know how to unblock the task. If it was just blankly unblocked it would just return 
-	// and keep running with no message
-	
-	// HOWEVER THE TASK IS STILL BLOCKED ONE MUST REPLY TO THE MESSAGE
-	# if DEBUG == 2
-	// Print the function called
-	// uart_printf(CONSOLE, "===============\r\n Proceeding with the Recieve Helper Called by %u:\r\n", PID);
-	# endif
-	// Those are the returning variables. The memories needed to be written when the recieve function returns
-	// THE RECIEVING TASK IS READING INTO THE MEMORY BUFFER OF THE SENDING TASK
-	// *tid is a pointer to the memory address of the TID
-
-
-
-
-	
-	// First need to access the mailbox
-	// The mailbox is the messageDS of the process
-	// The mailbox is a circular READY_QUEUE
-
-	uint64_t  curread_message_length = PROCS[p].message_recieved[head].msglen;
-	char *curread_msg = PROCS[p].message_recieved[head].msg;
-	int sender_tid = PROCS[p].message_recieved[head].tid;
-	*tid = sender_tid;
-	# if DEBUG == 2 
-		// strflush(curread_msg, curread_message_length); 
-	# endif
-	// msg is the destination curread_msg is the source
-	// msglen = cust_strcpy(msg, msglen - 1, curread_msg, curread_message_length - 1) + 1;
-	msglen = min_int(msglen, curread_message_length);
-	memcpy(msg, curread_msg, msglen);
-	
-	# if DEBUG == 2 
-		// strflush(msg, msglen); 
-		// uart_printf(CONSOLE, "recieve_buffer length is %d\r\n", msglen);
-	# endif
-	// DEBUG
-	# if DEBUG == 2
-	// Print the recieved message
-	// uart_printf(CONSOLE, "head is %u, tail is %u\r\n", head, tail);
-	// uart_printf(CONSOLE, "curread_msg is %s\r\n", curread_msg);
-	// uart_printf(CONSOLE, "curread_message_length is %u\r\n", curread_message_length);
-	// uart_printf(CONSOLE, "sender_tid TID is %u\r\n", sender_tid);
-	// uart_printf(CONSOLE, "msg is %s\r\n", msg);
-	// uart_printf(CONSOLE, "MSGLEN is %u\r\n ===============\r\n ", curread_message_length);
-	# endif
-	
-	// update the head
-
-	# if DEBUG == 2
-	// Print the recieved message
-	// uart_printf(CONSOLE, "TID is %u\r\n", sender_tid);
-	// uart_printf(CONSOLE, "curread_msg is %s\r\n", curread_msg);
-	// uart_printf(CONSOLE, "MSGLEN is %u\r\n ===============\r\n ", msglen);
-	# endif
-	// p is the current process, the process that is recieving
-	PROCS[p].waiting_recieve_head++;
-	if(PROCS[p].queuesize > 0){
-		PROCS[p].queuesize--;
-	}
-	PROCS[p].waiting_recieve_head %= QUEUESIZE;
-	PROCS[p].registervalues[0] = msglen;
-	unblock_ind(PID, PROCS[p].priority);
-	// return msglen;
-	
-	// this is the sender process. The sender is ready for a reply
-}
-void reply_helper(){
-	# if DEBUG == 2
-	// uart_printf(CONSOLE, "===============\r\n Reply Helper Called:\r\n");
-	# endif
-	// replies to the PID
-	int p = PID - 1;
-	int tid = PROCS[p].registervalues[0];
-	char *reply = (char *)PROCS[p].registervalues[1];
-	uint64_t replylen = PROCS[p].registervalues[2];
-	char *reply_buffer = PROCS[tid - 1].message_sent.reply;
-	uint64_t reply_buffer_len = PROCS[tid - 1].message_sent.replylen;
-	// Have the kernel copy the reply into the messageDS of the target task
-
-	// PROCS[tid - 1].message_sent.reply[replylen] = 0;
-
-
-	// // uart_printf(CONSOLE, "*reply is %c\r\n", *reply);
-	replylen = min_int(reply_buffer_len, replylen);
-	memcpy(reply_buffer, reply, replylen);
-	// replylen = cust_strcpy(reply_buffer, reply_buffer_len - 1, reply, replylen - 1) + 1;
-
-	
-	# if DEBUG == 2
-	// uart_printf(CONSOLE, "reply_buffer length is %d\r\n", replylen);
-	// Print the recieved message
-	// uart_printf(CONSOLE, "TID is %u\r\n", tid);
-	// uart_printf(CONSOLE, "REPLY is %s\r\n", reply);
-	// uart_printf(CONSOLE, "REPLYLEN is %u\r\n ===============\r\n ", replylen);
-	// uart_printf(CONSOLE, "replying to PID is %u, reply PID is %u\r\n", tid , PID );
-	// uart_printf(CONSOLE, "reply_buffer is %x, *reply is %x\r\n", reply_buffer, reply);
-	# endif
-	// 
-	// now unblock the target task
-	unblock_ind(tid, PROCS[tid - 1].priority);
-	// return a reply length for the send function
-	PROCS[tid - 1].registervalues[0] = replylen;
-	PROCS[tid - 1].waiting_reply = 0;
-	// return for the reply function
-	PROCS[p].registervalues[0] = replylen;
-	
-}
+// send_helper moved to layer2-messaging/messaging.c
+// recieve_helper moved to layer2-messaging/messaging.c
+// reply_helper moved to layer2-messaging/messaging.c
 
 void handlerExceptionHelper(uint64_t esr_el1)
 {
@@ -742,7 +562,13 @@ void handlerExceptionHelper(uint64_t esr_el1)
 			break;
 		case 2: // Create
 			scrSchedule(PID, PROCS[p].priority);
+			#if DEBUG_EXIT >= 1
+			uart_printf(CONSOLE, "[DEBUG] After scrSchedule in Create, READY_HEAP size=%u\r\n", READY_HEAP.size);
+			#endif
 			int ret = KernelCreate((uint64_t)PROCS[p].registervalues[0], (void(*)())PROCS[p].registervalues[1], PID);
+			#if DEBUG_EXIT >= 1
+			uart_printf(CONSOLE, "[DEBUG] After KernelCreate, created TID=%d, READY_HEAP size=%u\r\n", ret, READY_HEAP.size);
+			#endif
 			PROCS[p].registervalues[0] = ret;
 			break;
 		case 3: // mytid
@@ -791,7 +617,13 @@ void handlerExceptionHelper(uint64_t esr_el1)
 		case 6: // recieve blocks
 			// scrSchedule(PID, PROCS[p].priority, BLOCKED);
 			// There is a message in the mailbox
+			#if DEBUG_EXIT >= 1
+			uart_printf(CONSOLE, "[DEBUG] Receive called by PID=%u, blocking...\r\n", PID);
+			#endif
 			block(PID, PROCS[p].priority);
+			#if DEBUG_EXIT >= 1
+			uart_printf(CONSOLE, "[DEBUG] After block, READY_HEAP size=%u\r\n", READY_HEAP.size);
+			#endif
 			//PROCS[p].registervalues[0] = 
 			recieve_helper(PID);
 			
@@ -917,6 +749,10 @@ void Schedule()
 	int p = PID - 1;
 	// We need to reset the EL1 stack pointer as well
 	
+	#if DEBUG_EXIT >= 1
+	uart_printf(CONSOLE, "[DEBUG] Schedule: About to Begin PID=%u, PC=%x, SP=%x, X0=%x\r\n", PID, (unsigned)(uint64_t)PROCS[p].pcpointer, (unsigned)(uint64_t)PROCS[p].stackpointer, (unsigned)PROCS[p].registervalues[0]);
+	#endif
+	
 	#if DEBUG == 1
 	uart_printf(CONSOLE, "Beginning pcpointer: %x stackpointer: %x registervalues: %x registervalues: %x %x %x %x %x %x %x %x\r\n", p, PROCS[p].pcpointer, PROCS[p].stackpointer, PROCS[p].registervalues[0], PROCS[p].registervalues[24], PROCS[p].registervalues[25], PROCS[p].registervalues[26], PROCS[p].registervalues[27], PROCS[p].registervalues[28], PROCS[p].registervalues[29], PROCS[p].registervalues[30]); // DEBUG
 	// print all the register values
@@ -1017,7 +853,7 @@ int extractMin( struct MinHeap *h)
 
 struct MinHeap pidheap;
 int untouched_pid = 0;
-int KernelCreate(uint64_t priority, void (*function)(), int parent)
+int KernelCreate(uint8_t priority, void (*function)(), int parent)
 {	
 	
 	int p = 0;
@@ -1057,53 +893,39 @@ void Kill(int p) // p is the position of the process in the PROCS array
 	PROCS[p].pcpointer = NULL;
 	insertKey(&pidheap, p); // gotta return the PID back to the original state
 }
-// k2 send receive reply
-// k2 send
-// Version 1 implementation would have the task directlly tell the kernel
-// to put a specific message in the messageDS of the targeted task. 
-int Send(int tid, const char *msg, int msglen, char *reply, int replylen){
-	(void)tid; (void)msg; (void)msglen; (void)reply; (void)replylen;
-	asm("svc 5");
-	return 0;
-}
 
-int Receive(int *tid, char *msg, int msglen){
-	(void)tid; (void)msg; (void)msglen;
-	asm("svc 6");
-	return 0;
-}
-int Reply( int tid, void *reply, int replylen ){
-	(void)tid; (void)reply; (void)replylen;
-	asm("svc 7");
-	return 0;
-}
-int MyPriority(){
-	asm("svc 8");
-	return 0;
-}
-// helper functions 
-// mailbox is meant to get the messageDS array of the process. 
-// It would work exactlly like a mailbox.
+// ===== Layer 2 Functions: Send, Receive, Reply =====
+// Moved to layer2-messaging/messaging.c
+// See messaging.h for declarations
 
 // The Following are EL0 commands
 int MyTid()
 {
-	asm("svc 3");
-	return 0;
+	register int ret asm("x0");
+	asm volatile("svc 3" : "=r"(ret));
+	return ret;
 }
 int MyParentTid()
 {
-	asm("svc 4");
-	return 0;
+	register int ret asm("x0");
+	asm volatile("svc 4" : "=r"(ret));
+	return ret;
 }
 
-int Create(uint64_t priority, void (*function)()) { // Returns to the Kernel, then calls KernelCreate
+int MyPriority(){
+	register int ret asm("x0");
+	asm volatile("svc 8" : "=r"(ret));
+	return ret;
+}
+
+int Create(uint8_t priority, void (*function)()) { // Returns to the Kernel, then calls KernelCreate
 	(void)priority; (void)function;
-	asm("svc 2"); // The Kernel needs to put the pid in x0
-	return 0;
+	register int ret asm("x0");
+	asm volatile("svc 2" : "=r"(ret)); // The Kernel needs to put the pid in x0
+	return ret;
 }
 
-int CreateArgs(uint64_t priority, void (*function)(), uint64_t argsno, uint64_t *args) { // Returns to the Kernel, then calls KernelCreate
+int CreateArgs(uint8_t priority, void (*function)(), uint64_t argsno, uint64_t *args) { // Returns to the Kernel, then calls KernelCreate
 	(void)priority;
 	(void)function;
 	(void)argsno;

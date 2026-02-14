@@ -2,6 +2,10 @@
 #include "syscall.h"
 #include "processes.h"
 #include "gic.h"
+
+void context_switch_test(void);
+void run_layer2_tests(void);
+
 void* STACK_EL0_START; // Maybe delete this later
 #define CLOCKINTID 99
 #define CLOCKSERVERON 1
@@ -42,9 +46,9 @@ int kmain(void *reg) {
   uart_putc(CONSOLE, '\r');
   uart_putc(CONSOLE, '\n');
 
-  // Initialize basic system services
-  int tid = KernelCreate(-1, idle, 0);
-  (void)tid; // Unused for now
+  // Don't create idle task during testing - it interferes with messaging tests
+  // int tid = KernelCreate(255, idle, 0);
+  // (void)tid; // Unused for now
   
   uart_putc(CONSOLE, '[');
   uart_putc(CONSOLE, '3');
@@ -64,8 +68,8 @@ int kmain(void *reg) {
   uart_putc(CONSOLE, '\n');
   #endif
 
-  // Create a basic first user task
-  tid = KernelCreate(1, first_user_task, 0);
+  // Create messaging test task with low priority so created threads run first
+  int tid = KernelCreate(10, run_layer2_tests, 0);
   
   uart_putc(CONSOLE, '[');
   uart_putc(CONSOLE, '5');

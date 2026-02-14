@@ -12,6 +12,11 @@ int errno = 0;
 #define EINVAL 22  // Invalid argument  
 #define ENOMEM 12  // Out of memory
 
+// Define stat mode constants if not available
+#ifndef S_IFCHR
+#define S_IFCHR 0x2000  // Character device
+#endif
+
 // Close a file - not implemented
 int _close(int file) {
     (void)file;

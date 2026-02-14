@@ -2,12 +2,8 @@
 .align 4
 .global	Begin
 Begin:
-	// x0 Registers, x1 PC pointer, x2 Stack Pointer, x3 PSTATE, stackend is global
-	// Reg :x0,
-	// PC :x1,
-	// STACK :x2, 
-	// PSTATE, : x3
-	// EL1 stackptr
+	// x0 = Register buffer pointer, x1 = PC, x2 = Stack Pointer, x3 = PSTATE
+	// Set up exception return context
 	msr elr_el1, x1
 	msr sp_el0, x2
 	msr spsr_el1, x3
@@ -15,40 +11,27 @@ Begin:
 	ldr     x1, =stackend
 	mov     sp, x1
 	
-	mov	x30, x0 // move x0 to x30 to make life easier
+	// x0 = register buffer pointer - keep it for last!
+	// Load registers X1-X30 first, then X0 at the end
+	add x1, x0, #8      // x1 = address of registervalues[1]
+	ldp x1, x2, [x1], #16
+	ldp x3, x4, [x1], #16
+	ldp x5, x6, [x1], #16
+	ldp x7, x8, [x1], #16
+	ldp x9, x10, [x1], #16
+	ldp x11, x12, [x1], #16
+	ldp x13, x14, [x1], #16
+	ldp x15, x16, [x1], #16
+	ldp x17, x18, [x1], #16
+	ldp x19, x20, [x1], #16
+	ldp x21, x22, [x1], #16
+	ldp x23, x24, [x1], #16
+	ldp x25, x26, [x1], #16
+	ldp x27, x28, [x1], #16
+	ldp x29, x30, [x1], #16
 	
-	// Alright, time to move the registers
-	ldr x0, [x30], 8
-	ldr x1, [x30], 8
-	ldr x2, [x30], 8
-	ldr x3, [x30], 8
-	ldr x4, [x30], 8
-	ldr x5, [x30], 8
-	ldr x6, [x30], 8
-	ldr x7, [x30], 8
-	ldr x8, [x30], 8
-	ldr x9, [x30], 8
-	ldr x10, [x30], 8
-	ldr x11, [x30], 8
-	ldr x12, [x30], 8
-	ldr x13, [x30], 8
-	ldr x14, [x30], 8
-	ldr x15, [x30], 8
-	ldr x16, [x30], 8
-	ldr x17, [x30], 8
-	ldr x18, [x30], 8
-	ldr x19, [x30], 8
-	ldr x20, [x30], 8
-	ldr x21, [x30], 8
-	ldr x22, [x30], 8
-	ldr x23, [x30], 8
-	ldr x24, [x30], 8
-	ldr x25, [x30], 8
-	ldr x26, [x30], 8
-	ldr x27, [x30], 8
-	ldr x28, [x30], 8
-	ldr x29, [x30], 8
-	ldr x30, [x30], 8	
+	// Finally load X0 (now it's safe since we don't need the pointer anymore)
+	ldr x0, [x0]
 	
 	eret
 

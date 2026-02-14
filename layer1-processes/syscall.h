@@ -24,9 +24,9 @@ void Handle(void* sp);
 void Exception(uint64_t esr_el1);
 
 void Kill(int p);
-int KernelCreate(uint64_t priority, void (*function)(), int parent);
-int Create(uint64_t priority, void (*function)());
-int CreateArgs(uint64_t priority, void (*function)(), uint64_t argsno, uint64_t *args);
+int KernelCreate(uint8_t priority, void (*function)(), int parent);
+int Create(uint8_t priority, void (*function)());
+int CreateArgs(uint8_t priority, void (*function)(), uint64_t argsno, uint64_t *args);
 void Schedule();
 
 int MyTid();
@@ -37,10 +37,14 @@ int MyParentTid();
 void Yield();
 void Exit(); 
 
-// This is where K2 starts
+// ===== Layer 2: Message Passing (IPC) =====
+// Implementation in ../layer2-messaging/messaging.c
+// These functions enable inter-process communication via Send-Receive-Reply protocol
 int Send(int tid, const char *msg, int msglen, char *reply, int replylen);
 int Receive(int *tid, char *msg, int msglen);
 int Reply( int tid, void *reply, int replylen );
+
+// Message structure for IPC
 struct message{
     int tid; // to which task
     char *msg;
@@ -55,7 +59,7 @@ struct process {
 	uint32_t pstate;
 	int parentpid;
 	int pid;
-	uint64_t priority;
+	uint8_t priority;
 	uint64_t registervalues[31];
 	// define an array of messages such would be held in memory for each process.
 	// A kernel call is needed to get the message array for the process.
@@ -73,7 +77,7 @@ struct process {
 };
 struct state {
 	int pid;
-	uint64_t priority;
+	uint8_t priority;
     uint64_t time;
 };
 struct interrupt {
@@ -90,7 +94,7 @@ struct MinHeapState
 	struct state *harr;
 };
 
-void scrSchedule(int pid, uint64_t priority);
+void scrSchedule(int pid, uint8_t priority);
 int scrPick();
 void HandleASYNC(void* sp);
 void ExceptionASYNC(uint64_t esr_el1);

@@ -41,7 +41,64 @@ void init_solonoids() // First task as dictated in the reqs
 	Exit();
 }
 
+// Context switching test tasks
+// These tasks demonstrate context switching by alternating execution
+
+void context_test_task_A() {
+    for (int i = 0; i < 3; i++) {
+        uart_printf(CONSOLE, "  [A-%d] Before Yield\r\n", i);
+        Yield();
+        uart_printf(CONSOLE, "  [A-%d] After Yield\r\n", i);
+    }
+    uart_printf(CONSOLE, "  [A] Exiting\r\n");
+    Exit();
+}
+
+void context_test_task_B() {
+    for (int i = 0; i < 3; i++) {
+        uart_printf(CONSOLE, "    [B-%d] Before Yield\r\n", i);
+        Yield();
+        uart_printf(CONSOLE, "    [B-%d] After Yield\r\n", i);
+    }
+    uart_printf(CONSOLE, "    [B] Exiting\r\n");
+    Exit();
+}
+
+void context_test_task_C() {
+    for (int i = 0; i < 3; i++) {
+        uart_printf(CONSOLE, "      [C-%d] Before Yield\r\n", i);
+        Yield();
+        uart_printf(CONSOLE, "      [C-%d] After Yield\r\n", i);
+    }
+    uart_printf(CONSOLE, "      [C] Exiting\r\n");
+    Exit();
+}
+
+// Master task that creates the context switching test tasks
+void context_switch_test() {
+    uart_printf(CONSOLE, "\r\n========== CONTEXT SWITCHING TEST ==========\r\n");
+    uart_printf(CONSOLE, "Creating 3 tasks to demonstrate context switching...\r\n\r\n");
+    
+    // Create test tasks with different priorities
+    int tid_a = KernelCreate(1, context_test_task_A, 1);  
+    int tid_b = KernelCreate(2, context_test_task_B, 1);  
+    int tid_c = KernelCreate(3, context_test_task_C, 1);  
+    
+    uart_printf(CONSOLE, "Master: Created tasks - A(PID %d) B(PID %d) C(PID %d)\r\n", tid_a, tid_b, tid_c);
+    uart_printf(CONSOLE, "Master: Yielding to let tasks run...\r\n\r\n");
+    
+    // Yield multiple times to allow test tasks to complete
+    for (int i = 0; i < 15; i++) {
+        uart_printf(CONSOLE, "[MASTER-%d] Yielding\r\n", i);
+        Yield();
+        uart_printf(CONSOLE, "[MASTER-%d] Resumed\r\n", i);
+    }
+    
+    uart_printf(CONSOLE, "\r\n========== CONTEXT SWITCHING TEST COMPLETE ==========\r\n");
+    Exit();
+}
+
 void first_user_task() {
-    uart_printf(CONSOLE, "Galatea-NIX kernel ready.\r\n");
+    uart_printf(CONSOLE, "Hello from first_user_task\r\n");
     Exit();
 }

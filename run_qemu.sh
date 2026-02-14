@@ -5,7 +5,6 @@ set -e
 
 # Build the kernel
 echo "[*] Building kernel..."
-make clean > /dev/null 2>&1
 make > /dev/null 2>&1
 
 # Run QEMU with proper output forwarding
@@ -18,10 +17,8 @@ qemu-system-aarch64 \
   -nographic \
   -monitor none \
   -serial stdio \
-  -kernel 0-d273liu.elf \
-  2>&1 | tee qemu_run.log
+  -kernel 0-d273liu.elf
 
+echo ""
 echo "========================================="
 echo "[*] QEMU exited"
-echo "[*] Debug log saved to qemu_debug.log"
-echo "[*] Output saved to qemu_run.log"
