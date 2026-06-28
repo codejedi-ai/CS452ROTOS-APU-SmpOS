@@ -2,7 +2,20 @@
 #define _QLEARNING_SCHED_H_ 1
 
 #include <stdint.h>
-#include "config.h"
+
+/*
+ * Q-learning scheduler tunables. This server is self-contained and no longer
+ * depends on the kernel's config.h (the kernel scheduler is now a simple FIFO
+ * list; this AI scheduler lives under servers/).
+ */
+#define QL_MAX_THREADS      8
+#define QL_FIXED_SHIFT      10
+#define QL_ALPHA            32    /* learning rate * 1024 */
+#define QL_GAMMA            896   /* discount * 1024 (~0.875) */
+#define QL_EPSILON          128   /* explore 12.5% * 1024 */
+#define QL_THREAD_BOUNTY    0
+#define QL_THREAD_DUTY      1
+#define QL_AGENT_MAX_BUDGET 2048  /* max time budget (ticks) for binary search */
 
 #define QL_NUM_STATES     (1u << QL_MAX_THREADS)
 #define QL_QTABLE_ENTRIES (QL_NUM_STATES * QL_MAX_THREADS)

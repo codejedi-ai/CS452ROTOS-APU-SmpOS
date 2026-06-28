@@ -9,7 +9,6 @@
 #include "timer/systimer.h"
 #include "gic.h"
 #include "../layer2-messaging/messaging.h"
-#include "q_learning/qlearning_sched.h"
 
 // Forward declarations for functions that may be missing
 extern void EXIT();
@@ -36,125 +35,46 @@ static struct process_container PROCESS_CONTAINERS[NPROCESSES];
 static uint8_t PROCESS_SHARED_MEM[NPROCESSES][SHARED_MEM_PER_PROCESS];
 static struct state READY_QUEUE[NUMPROCS];
 static struct state BLOCKED_LIST[NUMPROCS];
-static struct MinHeapState READY_HEAP;
+static struct ReadyList READY_LIST;
 static struct interrupt AWAIT_INTERRUPT[MAXEVENT];
 
-// it is time to turn READY_QUEUE into a heap
-// enqueing on a heap is O(log(n))
-// first you 
 uint32_t kernelStartTime = 0;
 uint8_t NO_PARAMS = 0;
-// HEAP IMPLEMENTATION
 
-uint8_t compare_state(struct state a, struct state b)
+// SIMPLE FIFO READY LIST
+// The kernel ready queue is a plain round-robin list: push appends at the
+// tail, pop removes from the head. Scheduling order is insertion order;
+// priority is no longer used to order the list (any AI/Q-learning policy now
+// lives under servers/, decoupled from the kernel).
+
+// append to the tail of the list
+void ready_list_push( struct ReadyList *h, struct state k)
 {
-	if (a.priority < b.priority)
-		return 1;
-	else if (a.priority > b.priority)
-		return 2;
-	else
-	{
-		if(a.time == (uint64_t)-1)
-			return 2;
-		else if (b.time == (uint64_t)-1)
-			return 1;
-		else if (a.time < b.time)
-			return 1;
-		else if (a.time > b.time)
-			return 2;
-		else
-			return 0;
-	}
-}
-void swap_state(struct state *a, struct state *b)
-{
-	struct state temp;
-	temp.pid = a->pid;
-	temp.priority = a->priority;
-	temp.time = a->time;
-	// *a = *b;
-	a->pid = b->pid;
-	a->priority = b->priority;
-	a->time = b->time;
-	// *b = temp;
-	b->pid = temp.pid;
-	b->priority = temp.priority;
-	b->time = temp.time;
-}
-void _bubbleUp_state_heap( struct MinHeapState *h, int i)
-{
-	int parent = (i - 1) / 2;
-	if (1 == compare_state(h->harr[i], h->harr[parent]))
-	{
-		swap_state(&h->harr[i], &h->harr[parent]);
-		_bubbleUp_state_heap(h, parent);
-	}
-}
-void bubbleDown_state_heap( struct MinHeapState *h, int i)
-{
-	unsigned int left = 2 * i + 1;
-	unsigned int right = 2 * i + 2;
-	int smallest = i;
-	// if there is no child
-	if ((unsigned int)left >= h->size && (unsigned int)right >= h->size)
-		return;
-	// if there is only left child
-	if (left < h->size && (unsigned int)right >= h->size && compare_state(h->harr[left], h->harr[smallest]) == 1)
-		smallest = left;
-	// no need to look for the case of only right child as it is a complete binary tree, no right child implies no left child implies no child
-	// this is given there are two children
-	if (left < h->size &&  compare_state(h->harr[left], h->harr[smallest]) == 1)
-		smallest = left;
-	if (right < h->size &&  compare_state(h->harr[right], h->harr[smallest]) == 1)
-		smallest = right;
-	if (smallest != i)
-	{
-		swap_state(&h->harr[i], &h->harr[smallest]);
-		bubbleDown_state_heap(h, smallest);
-	}
-}
-// add to the heap
-void insertKey_state_heap( struct MinHeapState *h, struct state k)
-{
-	k.time = get_timerHI();
-	k.time = k.time << 32;
-	k.time += get_timerLO();
-	if (h->size == h->capacity)
+	if (h->size >= h->capacity)
 	{
 		return;
 	}
-	h->harr[h->size] = k;
-	_bubbleUp_state_heap(h, h->size);
+	h->items[h->size] = k;
 	h->size++;
 }
-// check if the heap is empty
-uint8_t isEmpty_state_heap( struct MinHeapState *h)
+// check if the list is empty
+uint8_t ready_list_empty( struct ReadyList *h)
 {
 	return h->size == 0;
 }
-// pop the minimum element
-struct state extractMin_state_heap( struct MinHeapState *h)
+// remove and return the head of the list (FIFO), shifting the rest down
+struct state ready_list_pop( struct ReadyList *h)
 {
-	if (h->size <= 0)
+	if (h->size == 0)
 		return (struct state){-1, 0, 0}; // Initialize all fields of the struct
-	if (h->size == 1)
-	{
-		h->size--;
-		return h->harr[0];
-	}
-	/*
-		int root = h->harr[0];
-	h->harr[0] = h->harr[h->size - 1];
+	struct state head = h->items[0];
+	for (unsigned i = 1; i < h->size; i++)
+		h->items[i - 1] = h->items[i];
 	h->size--;
-	*/
-	struct state root = h->harr[0];
-	h->harr[0] = h->harr[h->size - 1];
-	h->size--;
-	bubbleDown_state_heap(h, 0);
-	return root;
+	return head;
 }
 
-//HEAP IMPLEMENTATION END
+//SIMPLE FIFO READY LIST END
 
 // scrSchedule(pid, priority)
 void scrSchedule(int pid, uint8_t priority)
@@ -179,8 +99,8 @@ void scrSchedule(int pid, uint8_t priority)
 		}
 	}
 	*/
-	// put the process into the heap
-	insertKey_state_heap(&READY_HEAP, currItem);
+	// put the process at the tail of the ready list
+	ready_list_push(&READY_LIST, currItem);
 }
 
 // scrSchedule(pid, priority)
@@ -232,70 +152,15 @@ void unblock(struct state currItem)
 	unblock_ind(pid, priority);
 }
 
-#if USE_QL_SCHED
-/* Scratch for heap remove: re-insert all but the removed pid. */
-static struct state QL_SCRATCH[NUMPROCS];
-/* Remove pid from READY_HEAP; re-insert others. Return 1 if found and removed. */
-static int ql_heap_remove(int target_pid)
-{
-	unsigned n = 0;
-	while (!isEmpty_state_heap(&READY_HEAP)) {
-		struct state item = extractMin_state_heap(&READY_HEAP);
-		if (item.pid == target_pid) {
-			for (unsigned i = 0; i < n; i++)
-				insertKey_state_heap(&READY_HEAP, QL_SCRATCH[i]);
-			return 1;
-		}
-		QL_SCRATCH[n++] = item;
-		if (n >= NUMPROCS) break;
-	}
-	for (unsigned i = 0; i < n; i++)
-		insertKey_state_heap(&READY_HEAP, QL_SCRATCH[i]);
-	return 0;
-}
-#endif
-
 int scrPick()
 {
 	int pid = -1;
-	(void)pid; // used in both branches
 	#if DEBUG_EXIT >= 1
-	uart_printf(CONSOLE, "[DEBUG] scrPick: READY_HEAP size=%u\r\n", READY_HEAP.size);
+	uart_printf(CONSOLE, "[DEBUG] scrPick: READY_LIST size=%u\r\n", READY_LIST.size);
 	#endif
-	if (isEmpty_state_heap(&READY_HEAP)) return -1;
+	if (ready_list_empty(&READY_LIST)) return -1;
 
-#if USE_QL_SCHED
-	{
-		int ready_pids[QL_MAX_THREADS];
-		unsigned n_ready = 0;
-		/* If heap min is a non-RL thread (pid > QL_MAX_THREADS), schedule by heap order so it runs */
-		if (READY_HEAP.size > 0 && READY_HEAP.harr[0].pid > QL_MAX_THREADS) {
-			/* fall through to extractMin so high-TID threads (e.g. spinlock test workers) get scheduled */
-		} else {
-			for (unsigned i = 0; i < READY_HEAP.size && n_ready < QL_MAX_THREADS; i++) {
-				int p = READY_HEAP.harr[i].pid;
-				if (ql_pid_to_index(p) >= 0)
-					ready_pids[n_ready++] = p;
-			}
-			if (n_ready > 0) {
-				/* Agent: knapsack + binary-search budget for optimal value/time */
-				int chosen = ql_agent_plan(ready_pids, n_ready);
-				if (chosen < 0)
-					chosen = ql_pick_ready(ready_pids, n_ready);
-				if (chosen >= 0 && ql_heap_remove(chosen)) {
-					int a = ql_pid_to_index(chosen);
-					if (a >= 0) {
-						ql_record_action(ql_get_state(), (unsigned)a);
-						return chosen;
-					}
-				}
-			}
-		}
-		/* Fallback: no RL ready, pick failed, or non-RL at min — use heap min */
-	}
-#endif
-
-	struct state currItem = extractMin_state_heap(&READY_HEAP);
+	struct state currItem = ready_list_pop(&READY_LIST);
 	pid = currItem.pid;
 	#if DEBUG_EXIT >= 1
 	uart_printf(CONSOLE, "[DEBUG] scrPick: picked PID=%d, priority=%u\r\n", pid, currItem.priority);
@@ -306,15 +171,12 @@ int scrPick()
 void InitSys(void* reg)
 {	// For some reason, normal init to 0 just.. doesn't work?
 	kernelStartTime = get_timerLO();
-	READY_HEAP.size = 0;
-	READY_HEAP.capacity = NUMPROCS;
-	READY_HEAP.harr = READY_QUEUE;
+	READY_LIST.size = 0;
+	READY_LIST.capacity = NUMPROCS;
+	READY_LIST.items = READY_QUEUE;
 	STACKSTART = reg;
 	PID = 0;
 	malloc_init_default();  /* heap in BSS (RAM); 0x1000000 not valid on QEMU virt */
-#if USE_QL_SCHED
-	ql_init_layer1();  /* Q-learning + agent (heuristics, knapsack, binary-search budget) */
-#endif
 	for (int event = 0; event < MAXEVENT; event++){
 		AWAIT_INTERRUPT[event].len = 0;
 		AWAIT_INTERRUPT[event].eventq_len = 0;
@@ -556,10 +418,10 @@ void Handle(void* sp) // A helper function to pull some c variables into assembl
 	Schedule();
 	#if DEBUG_EXIT >= 1
 		uart_printf(CONSOLE, "All Tasks Complete, Press Any Key to Exit\n\r"); // Nothing left // Upon maybe K2, the Kernel may be waiting at this point for user input, or other stuff for Processes to wake up. At this point, the Kernel should in theory spin
-		// print the heap of ready tasks (not the entire array)
-		uart_printf(CONSOLE, "\r\nREADY HEAP (size=%u):\r\n", READY_HEAP.size);
-		for (unsigned i = 0; i < READY_HEAP.size; i++) {
-			uart_printf(CONSOLE, "  [%u] PID: %u, Priority: %u\r\n", i, READY_HEAP.harr[i].pid, READY_HEAP.harr[i].priority);
+		// print the ready list (not the entire array)
+		uart_printf(CONSOLE, "\r\nREADY LIST (size=%u):\r\n", READY_LIST.size);
+		for (unsigned i = 0; i < READY_LIST.size; i++) {
+			uart_printf(CONSOLE, "  [%u] PID: %u, Priority: %u\r\n", i, READY_LIST.items[i].pid, READY_LIST.items[i].priority);
 		}
 		uart_printf(CONSOLE, "\r\nAll PROCS states:\r\n");
 		for (int i = 0; i < NUMPROCS; i++) {
@@ -602,15 +464,6 @@ void handlerExceptionHelper(uint64_t esr_el1)
 		switch (i) {
 		
 		case 0: // Exit
-#if USE_QL_SCHED
-			{
-				int pid_val = p + 1;
-				uint32_t now = get_timerLO();
-				uint32_t runtime = (now >= kernelStartTime) ? (now - kernelStartTime) : 0;
-				int32_t effective = ql_effective_reward(pid_val, runtime);
-				ql_on_complete(pid_val, effective);
-			}
-#endif
 			Kill(p);
 			break;
 		case 1: // Yield
@@ -619,11 +472,11 @@ void handlerExceptionHelper(uint64_t esr_el1)
 		case 2: // Create
 			scrSchedule(PID, PROCS[p].priority);
 			#if DEBUG_EXIT >= 1
-			uart_printf(CONSOLE, "[DEBUG] After scrSchedule in Create, READY_HEAP size=%u\r\n", READY_HEAP.size);
+			uart_printf(CONSOLE, "[DEBUG] After scrSchedule in Create, READY_LIST size=%u\r\n", READY_LIST.size);
 			#endif
 			int ret = KernelCreate((uint64_t)PROCS[p].registervalues[0], (void(*)())PROCS[p].registervalues[1], PID);
 			#if DEBUG_EXIT >= 1
-			uart_printf(CONSOLE, "[DEBUG] After KernelCreate, created TID=%d, READY_HEAP size=%u\r\n", ret, READY_HEAP.size);
+			uart_printf(CONSOLE, "[DEBUG] After KernelCreate, created TID=%d, READY_LIST size=%u\r\n", ret, READY_LIST.size);
 			#endif
 			PROCS[p].registervalues[0] = ret;
 			break;
@@ -678,7 +531,7 @@ void handlerExceptionHelper(uint64_t esr_el1)
 			#endif
 			block(PID, PROCS[p].priority);
 			#if DEBUG_EXIT >= 1
-			uart_printf(CONSOLE, "[DEBUG] After block, READY_HEAP size=%u\r\n", READY_HEAP.size);
+			uart_printf(CONSOLE, "[DEBUG] After block, READY_LIST size=%u\r\n", READY_LIST.size);
 			#endif
 			//PROCS[p].registervalues[0] = 
 			recieve_helper(PID);

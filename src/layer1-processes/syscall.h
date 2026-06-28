@@ -91,11 +91,14 @@ struct interrupt {
 	int eventq_len, eventq_head, eventq_tail;
 };
 
-struct MinHeapState
+/* Simple FIFO ready list (round-robin). Items are dequeued in insertion
+ * order; priority is retained on struct state for messaging but does not
+ * affect scheduling order. */
+struct ReadyList
 {
 	unsigned size;
 	unsigned capacity;
-	struct state *harr;
+	struct state *items;
 };
 
 void scrSchedule(int pid, uint8_t priority);

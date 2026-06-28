@@ -25,7 +25,6 @@
 /* ----- Debug / scheduler ----- */
 #define DEBUG       5
 #define DEBUG_EXIT  0
-#define USE_QL_SCHED 1
 
 /* ----- Stack (per-thread stack size in bytes) ----- */
 #define STACK_SIZE_PER_THREAD  0x10000
@@ -36,16 +35,6 @@
 /* Per-process virtual heap: each process gets its own VRAM range (process_id → vram base). */
 #define VRAM_HEAP_BASE              0x10000UL
 #define VRAM_HEAP_SIZE_PER_PROCESS  0x10000UL  /* 64 KB virtual heap per process */
-
-/* ----- Q-learning scheduler ----- */
-#define QL_MAX_THREADS      8
-#define QL_FIXED_SHIFT      10
-#define QL_ALPHA            32    /* learning rate * 1024 */
-#define QL_GAMMA            896   /* discount * 1024 (~0.875) */
-#define QL_EPSILON          128   /* explore 12.5% * 1024 */
-#define QL_THREAD_BOUNTY    0
-#define QL_THREAD_DUTY      1
-#define QL_AGENT_MAX_BUDGET 2048  /* max time budget (ticks) for binary search */
 
 /* ----- Main / idle ----- */
 #define CLOCKSERVERON  1

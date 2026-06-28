@@ -25,7 +25,7 @@ endif
 
 CFLAGS:=-g -pipe -static $(WARNINGS) -ffreestanding -nostartfiles\
 	-mcpu=$(ARCH) -static-pie -mstrict-align -fno-builtin -mgeneral-regs-only \
-	-Ilayer0-assembly -Ilayer1-processes -Ilayer1-processes/malloc -Ilayer1-processes/q_learning -Ilayer1-processes/timer -Ilayer2-messaging -Ilibrary -fno-builtin-memcpy \
+	-Isrc/layer0-assembly -Isrc/layer1-processes -Isrc/layer1-processes/malloc -Isrc/layer1-processes/timer -Isrc/layer2-messaging -Ilibrary -fno-builtin-memcpy \
 	$(PLATFORM_FLAG)
 
 # -Wl,option tells g++ to pass 'option' to the linker with commas replaced by spaces
@@ -34,7 +34,9 @@ LDFLAGS:=-Wl,-nmagic -Wl,-Tlinker.ld -nostdlib
 
 # Source files and include dirs
 
-SOURCES := $(wildcard library/*.c) $(wildcard layer2-messaging/*.c) $(wildcard layer2-messaging/tests/*.c) $(wildcard layer1-processes/*.c) $(wildcard layer1-processes/malloc/*.c) $(wildcard layer1-processes/q_learning/*.c) $(wildcard layer1-processes/timer/*.c) $(wildcard layer1-processes/tests/*.c) $(wildcard layer0-assembly/*.S) $(wildcard layer0-assembly/tests/*.c) $(wildcard *.c) $(wildcard *.S) 
+# NOTE: servers/ (e.g. the Q-learning scheduler) is decoupled from the kernel
+# and intentionally NOT part of the kernel image build.
+SOURCES := $(wildcard library/*.c) $(wildcard src/layer2-messaging/*.c) $(wildcard src/layer2-messaging/tests/*.c) $(wildcard src/layer1-processes/*.c) $(wildcard src/layer1-processes/malloc/*.c) $(wildcard src/layer1-processes/timer/*.c) $(wildcard src/layer1-processes/tests/*.c) $(wildcard src/layer0-assembly/*.S) $(wildcard src/layer0-assembly/tests/*.c) $(wildcard *.c) $(wildcard *.S)
 # Create .o and .d files for every .cc and .S (hand-written assembly) file
 OBJECTS := $(patsubst %.c, %.o, $(patsubst %.S, %.o, $(SOURCES)))
 DEPENDS := $(patsubst %.c, %.d, $(patsubst %.S, %.d, $(SOURCES)))
@@ -46,16 +48,15 @@ clean:
 	rm -f $(OBJECTS) $(DEPENDS) 0-d273liu.elf 0-d273liu.img
 	rm -f *.o *.d
 	rm -f library/*.o library/*.d
-	rm -f layer0-assembly/*.o layer0-assembly/*.d
-	rm -f layer0-assembly/tests/*.o layer0-assembly/tests/*.d
-	rm -f layer1-processes/*.o layer1-processes/*.d
-	rm -f layer1-processes/qlearning_sched.o layer1-processes/qlearning_sched.d
-	rm -f layer1-processes/q_learning/*.o layer1-processes/q_learning/*.d
-	rm -f layer1-processes/timer/*.o layer1-processes/timer/*.d
-	rm -f layer1-processes/systimer.o layer1-processes/systimer.d
-	rm -f layer1-processes/tests/*.o layer1-processes/tests/*.d
-	rm -f layer2-messaging/*.o layer2-messaging/*.d
-	rm -f layer2-messaging/tests/*.o layer2-messaging/tests/*.d
+	rm -f src/layer0-assembly/*.o src/layer0-assembly/*.d
+	rm -f src/layer0-assembly/tests/*.o src/layer0-assembly/tests/*.d
+	rm -f src/layer1-processes/*.o src/layer1-processes/*.d
+	rm -f src/layer1-processes/malloc/*.o src/layer1-processes/malloc/*.d
+	rm -f src/layer1-processes/timer/*.o src/layer1-processes/timer/*.d
+	rm -f src/layer1-processes/tests/*.o src/layer1-processes/tests/*.d
+	rm -f src/layer2-messaging/*.o src/layer2-messaging/*.d
+	rm -f src/layer2-messaging/tests/*.o src/layer2-messaging/tests/*.d
+	rm -f servers/q_learning/*.o servers/q_learning/*.d
 
 0-d273liu.img: 0-d273liu.elf
 	$(OBJCOPY) $< -O binary $@
