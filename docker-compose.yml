@@ -23,13 +23,6 @@ x-dev: &dev
     - DISK_ROOT=/disk
 
 services:
-  shell:
-    <<: *dev
-    stdin_open: true
-    tty: true
-    entrypoint: ["bash", "/workspace/scripts/container-run.sh"]
-    command: shell
-
   build:
     <<: *dev
     entrypoint: ["bash", "/workspace/scripts/container-run.sh"]
