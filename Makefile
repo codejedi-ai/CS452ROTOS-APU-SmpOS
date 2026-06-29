@@ -36,7 +36,7 @@ LINK_BASE := 0x80000
 
 CFLAGS:=-g -pipe -static $(WARNINGS) -ffreestanding -nostartfiles \
 	-mcpu=$(ARCH) -march=$(MARCH) -mstrict-align -fno-builtin -mgeneral-regs-only \
-	-I$(SRC)/layer0-assembly -I$(SRC)/layer1-processes \
+	-I$(SRC)/common/kernel -I$(SRC)/layer0-assembly -I$(SRC)/layer1-processes \
 	-I$(SRC)/layer1-processes/q_learning -I$(SRC)/layer1-processes/timer \
 	-I$(SRC)/layer2-messaging -I$(SRC)/layer3-services -I$(SRC)/layer3-services/uart/io_api -I$(SRC)/layer3-services/uart/io_common -I$(SRC)/layer3-services/uart/io_notifier -I$(SRC)/layer3-services/uart/UART1_CONSOLE_server -I$(SRC)/layer3-services/uart/UART2_MARKLIN_server \
 	-I$(SRC)/layer5-applications -I$(SRC)/library -fno-builtin-memcpy
@@ -64,7 +64,6 @@ EXCLUDE_SRCS := \
 	$(SRC)/layer3-services/display_tetris_client.c \
 	$(SRC)/layer3-services/apuserver.c \
 	$(SRC)/layer1-processes/shell.c \
-	$(SRC)/layer1-processes/malloc/malloc.c \
 	$(SRC)/layer1-processes/task_heap.c \
 	$(SRC)/layer5-applications/snake.c \
 	$(SRC)/layer5-applications/tetris.c \
@@ -81,6 +80,7 @@ EXCLUDE_SRCS := \
 
 SOURCES := $(filter-out $(EXCLUDE_SRCS), \
            $(wildcard $(SRC)/library/*.c) \
+           $(wildcard $(SRC)/common/kernel/*.c) \
            $(wildcard $(SRC)/layer2-messaging/*.c) \
            $(wildcard $(SRC)/layer2-messaging/tests/*.c) \
            $(wildcard $(SRC)/layer3-services/*.c) \
@@ -88,6 +88,7 @@ SOURCES := $(filter-out $(EXCLUDE_SRCS), \
            $(wildcard $(SRC)/layer3-services/tests/*.c) \
            $(wildcard $(SRC)/layer5-applications/*.c) \
            $(wildcard $(SRC)/layer1-processes/*.c) \
+           $(wildcard $(SRC)/layer1-processes/malloc/*.c) \
            $(wildcard $(SRC)/layer1-processes/q_learning/*.c) \
            $(wildcard $(SRC)/layer1-processes/timer/*.c) \
            $(wildcard $(SRC)/layer0-assembly/*.S) \
