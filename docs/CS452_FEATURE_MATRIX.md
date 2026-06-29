@@ -34,9 +34,9 @@ Family-wide copy lives in each kernel repo under `docs/CS452_FEATURE_MATRIX.md`.
 | `CS452ROTOS-SMP-MekkanaOS` | MekkanaOS | SMP-line | k0–k4 + tc1 | ● | after K-tests | ● | ○ | ○ | ● `MODE=qemu` | Refactor + boot tests |
 | `CS452ROTOS-SMP-PrimeOS` | PrimeOS | SMP-line | k0–k4 + tc1 | ● | `commands_shell` | ● | ○ | ○ | ● | GitHub mirror |
 | `uwaterloo_…-cs452-trains` | PrimeOS | SMP-line | k0–k4 + tc1 | ● | `commands_shell` | ● | ○ | ○ | ● | Course hand-in (GitLab) |
-| `CS452ROTOS-APU-SmpOS` | SmpOS | APU-line | layer0–5 | ● | display shell | ● | ● APUServer | ◐ **SMP lead** | ● + prod screen | **Canonical APU** |
-| `CS452ROTOS-APU-KatarOS` | KatarOS | APU-line | layer0–5 | ● | display shell | ● | ● APUServer | ○ | ● + prod screen | APU variant (production NIX) |
-| `CS452ROTOS-APU-NyxOS` | NyxOS | APU-line | layer0–5 | ● | display shell | ● | ● APUServer | ○ | ● + prod screen | APU variant (Docker-pinned) |
+| `CS452ROTOS-APU-SmpOS` | SmpOS | APU-line | layer0–5 | ● | display shell | ● | ● APUServer | ◐ **SMP lead** | ● `./dev.sh make all` | **Canonical APU** |
+| `CS452ROTOS-APU-KatarOS` | KatarOS | APU-line | layer0–5 | ● | display shell | ● | ● APUServer | ○ | ● `./dev.sh make all` | APU variant (production NIX) |
+| `CS452ROTOS-APU-NyxOS` | NyxOS | APU-line | layer0–5 | ● | display shell | ● | ● APUServer | ○ | ● `./dev.sh make all` | APU variant (Docker-pinned) |
 | `CS452ROTOS-APU-AtariOS` | AtariOS | APU-line | layer0–5 | ● | display + `ConsoleGetc` | ◐ | ● APUServer | ○ | ● | APU variant (NIX snapshot) |
 | `CS452ROTOS-PLATFORM` | — | — | — | — | — | — | — | — | ● `./build.sh` | Shared toolchain / QEMU image |
 

@@ -24,6 +24,9 @@
 #define RXIC        4
 #define CTSMIM      1
 
+/* ----- Scheduler priorities (uint8_t; lower number = runs sooner) ----- */
+#define SCHED_LOWEST_PRIORITY  255   /* idle — only scheduled when nothing else is ready */
+
 /* ----- Debug / scheduler ----- */
 #define DEBUG       5
 #define DEBUG_EXIT  0

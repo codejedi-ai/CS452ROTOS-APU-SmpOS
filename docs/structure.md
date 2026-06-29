@@ -16,8 +16,7 @@ d273liu-nix/
 ├── Makefile                # builds kernel ELF + flat .img from src/
 ├── README.md
 ├── Dockerfile              # dev image (toolchain + QEMU raspi4b)
-├── Dockerfile.prod         # prod image (kernel baked in, serves browser screen @ 9090)
-├── dev.sh, prod.sh         # dev/prod drivers
+├── dev.sh                  # dev driver (shell, build, run, test)
 ├── qemu-rpi4.sh, mkpi.sh, …
 ├── docs/                   # documentation
 ├── calibrationdata/        # optional train CSV (not linked into kernel)
@@ -44,7 +43,6 @@ folders. Historical notes: [docs/archive/](archive/).
 | **project.mk** | `PROJECT_ID`, `PROJECT_NAME`, `KERNEL_ELF`, `KERNEL_IMG`, Docker names. |
 | **Makefile** | Compiles `src/` layers, links with `src/linker.ld`, emits `$(KERNEL_IMG)`. |
 | **dev.sh** | Docker dev: `shell`, `build`, `test`, `run`, `pi`, `clean`. |
-| **prod.sh** | Web terminal: `up`, `down`, `build`, `logs`. |
 
 Build products at repo root (gitignored): `$(KERNEL_ELF)`, `$(KERNEL_IMG)`, `pi-boot/`.
 

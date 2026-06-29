@@ -122,9 +122,6 @@ unsigned apu_util_tenths(int core_id)
 
 void idle_entry(void)
 {
-    uart_printf(CONSOLE, "\033[1;32m[  OK  ]\033[0m Idle task (TID=%d)\r\n",
-                MyTid());
-
     unsigned long long freq = sys_freq();
 
     for (;;) {

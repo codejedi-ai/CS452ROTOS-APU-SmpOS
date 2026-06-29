@@ -13,4 +13,5 @@ echo "[*] Booting $KERNEL_IMG on QEMU raspi4b -- interactive terminal"
 echo "[*] Quit QEMU with: Ctrl-A then X"
 echo "========================================="
 
+export CONSOLE=stdio MARKLIN=off
 exec bash qemu-rpi4.sh "$KERNEL_IMG"

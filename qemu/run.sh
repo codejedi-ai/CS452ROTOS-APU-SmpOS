@@ -10,7 +10,7 @@
 #
 # Environment knobs:
 #   CONSOLE=stdio|tcp|pty   — serial0 backend     (default: stdio)
-#   MARKLIN=mhw|pty|off     — serial1/AUX backend  (default: mhw)
+#   MARKLIN=vhw|pty|stdio|off — serial1/AUX backend  (default: vhw)
 #   CONSOLE_PORT=7000       — TCP port when CONSOLE=tcp
 #   QEMU_CPU=cortex-a72
 #   QEMU_MEM=2048
@@ -26,7 +26,7 @@ IMG="${1:-$KERNEL_IMG}"
 CPU="${QEMU_CPU:-cortex-a72}"
 MEM="${QEMU_MEM:-2048}"
 CONSOLE="${CONSOLE:-stdio}"
-MARKLIN="${MARKLIN:-mhw}"
+MARKLIN="${MARKLIN:-vhw}"
 DTB="$ROOT/qemu/bcm2711-rpi-4-b.dtb"
 MHW="$ROOT/marklin-virtual-hardware/my_program"
 
@@ -34,9 +34,18 @@ MHW="$ROOT/marklin-virtual-hardware/my_program"
 if [ "$MARKLIN" = stdio ] && [ "$CONSOLE" = stdio ]; then CONSOLE=pty; fi
 
 # ---- serial0: console (UART0) ------------------------------------------------
-CONSOLE_SERIAL="stdio"
+# Use a separately-defined chardev for stdio so we can pass signal=off — without
+# it, QEMU's default `-serial stdio` traps SIGINT on the host TTY and exits the
+# moment the user hits Ctrl-C, collapsing the container before the byte ever
+# reaches the guest. With signal=off the byte is delivered to UART0 like any
+# other key; quit QEMU with Ctrl-A X.
+CONSOLE_SERIAL=""
+CONSOLE_CHARDEV=""
 case "$CONSOLE" in
-stdio) CONSOLE_SERIAL="stdio" ;;
+stdio)
+  CONSOLE_CHARDEV="stdio,id=os_console,signal=off"
+  CONSOLE_SERIAL="chardev:os_console"
+  ;;
 pty)
   CONSOLE_SERIAL="pty"
   echo "[*] OS console -> pty (see 'char device redirected' below)"
@@ -46,7 +55,11 @@ tcp)
   CONSOLE_SERIAL="tcp:0.0.0.0:${CONSOLE_PORT},server=on,wait=on"
   echo "[*] OS console -> TCP :$CONSOLE_PORT"
   ;;
-*) echo "[!] unknown CONSOLE='$CONSOLE' (use stdio|tcp|pty); using stdio" >&2 ;;
+*)
+  echo "[!] unknown CONSOLE='$CONSOLE' (use stdio|tcp|pty); using stdio" >&2
+  CONSOLE_CHARDEV="stdio,id=os_console,signal=off"
+  CONSOLE_SERIAL="chardev:os_console"
+  ;;
 esac
 
 # ---- serial1: AUX mini-UART — Marklin virtual hardware -----------------------
@@ -79,19 +92,19 @@ stdio)
 off)
   echo "[*] Marklin AUX (serial1) = null"
   ;;
-*) echo "[!] unknown MARKLIN='$MARKLIN' (use mhw|pty|stdio|off); AUX = null" >&2 ;;
+*) echo "[!] unknown MARKLIN='$MARKLIN' (use vhw|pty|stdio|off); AUX = null" >&2 ;;
 esac
 
 # ---- QEMU launch -------------------------------------------------------------
-exec qemu-system-aarch64 \
-  -M raspi4b \
-  -cpu "$CPU" \
-  -smp 4 \
-  -m "$MEM" \
-  -accel tcg,thread=multi \
-  -dtb "$DTB" \
-  -display none \
-  -serial "$CONSOLE_SERIAL" \
-  -serial "$MARKLIN_SERIAL" \
-  -nic none \
-  -kernel "$IMG"
+QEMU_ARGS=(
+  -M raspi4b
+  -cpu "$CPU"
+  -smp 4
+  -m "$MEM"
+  -accel tcg,thread=multi
+  -dtb "$DTB"
+  -display none
+)
+[ -n "$CONSOLE_CHARDEV" ] && QEMU_ARGS+=(-chardev "$CONSOLE_CHARDEV")
+QEMU_ARGS+=(-serial "$CONSOLE_SERIAL" -serial "$MARKLIN_SERIAL" -nic none -kernel "$IMG")
+exec qemu-system-aarch64 "${QEMU_ARGS[@]}"

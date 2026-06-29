@@ -65,6 +65,15 @@ int kmain(void *reg) {
   route_interrupt(UARTINTER, 0);
   enable_interrupt(UARTINTER);
   enable_RX_and_TX();
+  /* Name server: create first AND publish its tid synchronously. Doing only
+   * "create first" isn't enough — name_server_entry's `ns_tid = MyTid()`
+   * yields, so other priority-0 tasks (io_notifier, UART servers) race past
+   * their RegisterAs while ns_tid is still -1, silently no-op, and the
+   * resulting unregistered io_notifier drops every UART RX event. */
+  {
+    int ns_tid_val = KernelCreate(0, name_server_entry, 0);
+    NameServerSetTid(ns_tid_val);
+  }
   KernelCreate(0, io_notifier, 0);
   KernelCreate(0, UART2_MARKLIN_server, 0);
   KernelCreate(0, UART1_CONSOLE_server, 0);
@@ -72,7 +81,6 @@ int kmain(void *reg) {
   gentimer_arm_ms(10);
   uart_printf(CONSOLE, "\033[1;32m[  OK  ]\033[0m Generic timer tick configured (PPI %d)\r\n", CLOCKINTID);
 
-  KernelCreate(NAME_SERVER_PRIORITY, name_server_entry, 0);
   /* Three per-core APU servers — each owns one secondary core. */
   KernelCreate(APU_SERVER_PRIORITY, apu1_server_entry, 0);
   KernelCreate(APU_SERVER_PRIORITY, apu2_server_entry, 0);
@@ -92,7 +100,7 @@ int kmain(void *reg) {
 #endif
 
 #if START_SHELL == 1
-  KernelCreate(20, terminal_shell_entry, 0);
+  KernelCreate(TERMINAL_SHELL_PRIORITY, terminal_shell_entry, 0);
 #endif
 
 #if CLOCKSERVERON != 1

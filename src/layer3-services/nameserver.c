@@ -24,6 +24,11 @@ int NameServerTid(void)
 	return ns_tid;
 }
 
+void NameServerSetTid(int tid)
+{
+	ns_tid = tid;
+}
+
 static int ns_find(const char *name)
 {
 	for (int i = 0; i < ns_count; i++) {

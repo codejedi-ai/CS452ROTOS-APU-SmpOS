@@ -19,6 +19,12 @@ typedef struct {
 
 void name_server_entry(void);
 int NameServerTid(void);
+/* Set the name server's tid synchronously. Must be called from kmain right
+ * after KernelCreate(name_server_entry, ...) so the value is visible before
+ * any other task runs RegisterAs/WhoIs. Without this, name_server_entry's
+ * own `ns_tid = MyTid()` only stores after MyTid yields, by which point
+ * higher-FIFO-priority tasks have already raced past their RegisterAs. */
+void NameServerSetTid(int tid);
 void RegisterAs(const char *name);
 int WhoIs(const char *name);
 

@@ -1,7 +1,10 @@
 #ifndef IDLE_H
 #define IDLE_H
 
-#define IDLE_PRIORITY 31
+#include "../layer1-processes/config.h"
+
+/* Lowest scheduling precedence — runs only when every other task is blocked. */
+#define IDLE_PRIORITY SCHED_LOWEST_PRIORITY
 
 void idle_entry(void);
 

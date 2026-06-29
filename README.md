@@ -14,9 +14,8 @@ Formerly **CS452ROTOS-SMP-SmpOS** / GalateaOS / `Galatea-NIX` on GitHub.
 ```bash
 ./dev.sh build-image    # pull shared platform image (once)
 ./dev.sh make all       # kernel → os/0-d273liu.img
-./dev.sh run            # interactive QEMU (OS terminal)
+./dev.sh run            # build + interactive QEMU stdio terminal
 ./dev.sh test           # timed smoke boot
-./prod.sh up            # browser screen @ http://localhost:7681
 ```
 
 ## Layout
