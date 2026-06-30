@@ -1,104 +1,75 @@
 #!/usr/bin/env bash
-# Dev wrapper — mounts this kernel repo into the CS452ROTOS-PLATFORM container.
-# Terminal-only on the host TTY. Browser / ttyd remote dev is PLATFORM-only
-# (see CS452ROTOS-PLATFORM README); OS repos never start ttyd.
+# Host dev wrapper — DarcyOS (APU)
 set -euo pipefail
 
+OS_NAME="DarcyOS (APU)"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLATFORM_DEFAULT="${ROOT}/../github_codejedi-ai_CS452ROTOS-PLATFORM"
-if [ -d "${PLATFORM_DEFAULT}" ]; then
-	PLATFORM="$(cd "${PLATFORM_DEFAULT}" && pwd)"
-else
-	PLATFORM="${PLATFORM:-}"
-fi
 cd "$ROOT"
 
-DC=(docker compose)
+PLATFORM_DEFAULT="${ROOT}/../github_codejedi-ai_CS452ROTOS-PLATFORM"
+if [[ -d "${PLATFORM_DEFAULT}" ]]; then
+	PLATFORM="$(cd "${PLATFORM_DEFAULT}" && pwd)"
+elif [[ -n "${PLATFORM:-}" && -d "${PLATFORM}" ]]; then
+	PLATFORM="$(cd "${PLATFORM}" && pwd)"
+else
+	echo "Cannot find CS452ROTOS-PLATFORM (expected ${PLATFORM_DEFAULT} or set PLATFORM)." >&2
+	exit 1
+fi
+
+# shellcheck source=../setup-host-env.sh
+source "${PLATFORM}/scripts/setup-host-env.sh"
 
 usage() {
-	cat <<'EOF'
+	cat <<EOF
 Usage: ./dev.sh <command>
 
 Commands:
-  build-image Pull/build the shared platform image (Docker Hub or local PLATFORM)
-  run         Build kernel and run in QEMU — host terminal (Ctrl+A X to exit)
-  test        CI smoke test (timed QEMU boot)
-  test-k1     Run K1 tests under QEMU
-  test-k2     Run K2 tests under QEMU
-  test-k3     Run K3 tests under QEMU
-  test-k4     Run K4 tests under QEMU
-  make [args] Run make inside the container (default: make all)
+  setup       Install/check host toolchain and QEMU (from CS452ROTOS-PLATFORM)
+  run         Build kernel and run in QEMU on the host (Ctrl+A X to exit)
+  test        Timed smoke boot under QEMU
+  make [args] Run make on the host (default: make all)
 
 Environment:
-  DARCYOS_IMAGE   default: codejedi-ai/cs452rotos-platform:latest
-  PLATFORM        override path to CS452ROTOS-PLATFORM checkout (optional)
+  XDIR        ARM GNU toolchain prefix (default: /opt/toolchain)
+  PLATFORM    Path to CS452ROTOS-PLATFORM checkout (optional)
 EOF
 }
 
-ensure_image() {
-	DARCYOS_IMAGE="${DARCYOS_IMAGE:-codejedi-ai/cs452rotos-platform:latest}"
-	if [ -n "${PLATFORM}" ] && [ -f "${PLATFORM}/scripts/ensure-image.sh" ]; then
-		# shellcheck source=/dev/null
-		source "${PLATFORM}/scripts/ensure-image.sh"
-		return 0
-	fi
-	if docker image inspect "${DARCYOS_IMAGE}" >/dev/null 2>&1; then
-		return 0
-	fi
-	echo "Pulling ${DARCYOS_IMAGE} from Docker Hub..."
-	docker pull "${DARCYOS_IMAGE}"
-}
-
-kvm_args() {
-	if [ -e /dev/kvm ]; then
-		echo --device /dev/kvm
-		if command -v getent >/dev/null 2>&1 && getent group kvm >/dev/null 2>&1; then
-			echo --group-add "$(getent group kvm | cut -d: -f3)"
-		fi
+setup_terminal() {
+	if [[ -t 0 ]]; then
+		stty -icanon -echo min 1 time 0 2>/dev/null || true
+		trap 'stty icanon echo 2>/dev/null || true' EXIT INT TERM
 	fi
 }
 
-compose_run() {
-	local service="$1"
-	shift
-	local -a tty=(-i)
-	if [ -t 0 ] && [ -t 1 ]; then
-		tty=(-it)
-	fi
-	# Bash 3.2 (macOS): empty "${kvm[@]}" trips set -u; skip KVM args when absent.
-	if [ -e /dev/kvm ]; then
-		# shellcheck disable=SC2046
-		"${DC[@]}" run --rm "${tty[@]}" $(kvm_args) "$service" "$@"
-	else
-		"${DC[@]}" run --rm "${tty[@]}" "$service" "$@"
-	fi
+run_os() {
+	setup_terminal
+	echo "Starting ${OS_NAME} under QEMU (raspi4b). Ctrl+A then X to exit."
+	exec bash "${ROOT}/run.sh"
 }
 
 cmd="${1:-run}"
 shift || true
 
 case "${cmd}" in
-	build|build-image)
-		ensure_image
+	setup)
+		setup_host_env "${ROOT}"
+		echo "Host toolchain and QEMU are ready."
 		;;
 	run)
-		ensure_image
-		compose_run run
+		setup_host_env "${ROOT}"
+		run_os
 		;;
 	test)
-		ensure_image
-		"${DC[@]}" run --rm -T $(kvm_args) test
-		;;
-	test-k1|test-k2|test-k3|test-k4)
-		ensure_image
-		"${DC[@]}" run --rm -T $(kvm_args) build "${cmd}"
+		setup_host_env "${ROOT}"
+		exec bash "${ROOT}/test.sh"
 		;;
 	make)
-		ensure_image
-		if [ "$#" -eq 0 ]; then
-			"${DC[@]}" run --rm -T $(kvm_args) build
+		setup_host_env "${ROOT}"
+		if [[ "$#" -eq 0 ]]; then
+			make -j"$(nproc)" all
 		else
-			"${DC[@]}" run --rm -T $(kvm_args) build make "$@"
+			make -j"$(nproc)" "$@"
 		fi
 		;;
 	help|-h|--help)

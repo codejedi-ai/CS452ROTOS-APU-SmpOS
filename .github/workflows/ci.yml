@@ -19,7 +19,15 @@ jobs:
         with:
           repository: codejedi-ai/CS452ROTOS-PLATFORM
           path: github_codejedi-ai_CS452ROTOS-PLATFORM
+          lfs: true
+
+      - name: Setup host platform (QEMU + toolchain)
+        run: |
+          cd github_codejedi-ai_CS452ROTOS-PLATFORM
+          sudo ./scripts/setup-host.sh
 
       - name: Build kernel
         working-directory: kernel
+        env:
+          PLATFORM: ${{ github.workspace }}/github_codejedi-ai_CS452ROTOS-PLATFORM
         run: ./dev.sh make all
